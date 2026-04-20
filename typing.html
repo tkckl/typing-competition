@@ -1,0 +1,1958 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中文打字競速比賽</title>
+    <!--
+    ============================================================
+    中文打字競速比賽 - Chinese Typing Speed Competition
+    ============================================================
+    Setup Instructions:
+    1. Go to https://console.firebase.google.com/
+    2. Create a new project (or use existing)
+    3. Go to Realtime Database > Create Database
+    4. Choose "Start in TEST mode" (or set rules below)
+    5. Copy your config from Project Settings > General > Your apps > Web app
+    6. Replace the FIREBASE_CONFIG below with your config
+    
+    Firebase Database Rules (for competition use):
+    {
+      "rules": {
+        "rooms": {
+          "$roomId": {
+            ".read": true,
+            ".write": true
+          }
+        }
+      }
+    }
+    
+    Embedding in Google Sites:
+    1. Host this file (GitHub Pages, school server, etc.)
+    2. In Google Sites: Insert > Embed > By URL
+    3. Paste the hosted URL
+    ============================================================
+    -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #4F46E5;
+            --primary-light: #818CF8;
+            --success: #10B981;
+            --error: #EF4444;
+            --warning: #F59E0B;
+            --bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card: #ffffff;
+            --text: #1F2937;
+            --text-light: #6B7280;
+            --shadow: 0 10px 40px rgba(0,0,0,0.15);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", "微軟正黑體", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            color: var(--text);
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: var(--shadow);
+            width: 100%;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--primary), #9333EA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        h2 {
+            text-align: center;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: var(--text-light);
+            margin-bottom: 30px;
+            font-size: 1em;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text);
+        }
+        
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #E5E7EB;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+        
+        input[type="text"]:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .btn:active { transform: translateY(0); }
+        
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-error { background: var(--error); color: white; }
+        .btn-outline { background: white; color: var(--primary); border: 2px solid var(--primary); }
+        .btn-lg { padding: 16px 40px; font-size: 18px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        /* Room Code Display */
+        .room-code-display {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #F3F4F6;
+            border-radius: 16px;
+        }
+        
+        .room-code-display .code {
+            font-size: 3em;
+            font-weight: 800;
+            letter-spacing: 0.2em;
+            color: var(--primary);
+            font-family: "Courier New", monospace;
+        }
+        
+        .room-code-display .hint {
+            color: var(--text-light);
+            margin-top: 8px;
+        }
+        
+        /* Player List */
+        .player-list {
+            list-style: none;
+            margin: 16px 0;
+        }
+        
+        .player-list li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            border-radius: 10px;
+            margin-bottom: 6px;
+            background: #F9FAFB;
+            font-size: 15px;
+        }
+        
+        .player-list li .badge {
+            background: var(--warning);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        /* Article Presets */
+        .preset-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        
+        .preset-btn {
+            padding: 6px 14px;
+            border: 2px solid #E5E7EB;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        
+        .preset-btn:hover, .preset-btn.active {
+            border-color: var(--primary);
+            background: #EEF2FF;
+            color: var(--primary);
+        }
+        
+        /* Game Screen */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #F3F4F6;
+        }
+        
+        .stat-box {
+            text-align: center;
+        }
+        
+        .stat-box .stat-value {
+            font-size: 1.8em;
+            font-weight: 800;
+            color: var(--primary);
+        }
+        
+        .stat-box .stat-label {
+            font-size: 0.8em;
+            color: var(--text-light);
+        }
+        
+        /* Target Text Display */
+        .target-text {
+            font-size: 22px;
+            line-height: 2;
+            padding: 20px;
+            background: #FAFAFA;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            user-select: none;
+            -webkit-user-select: none;
+            letter-spacing: 2px;
+            min-height: 220px; /* increased show area */
+            max-height: 420px;
+            overflow-y: auto;
+            word-break: break-all;
+        }
+        
+        .target-text .char {
+            position: relative;
+            display: inline-block;
+            transition: all 0.1s;
+        }
+        
+        .target-text .char.correct {
+            color: var(--success);
+            background: #D1FAE5;
+            border-radius: 4px;
+        }
+        
+        .target-text .char.wrong {
+            color: white;
+            background: var(--error);
+            border-radius: 4px;
+        }
+        
+        .target-text .char.current {
+            background: #FEF3C7;
+            border-bottom: 3px solid var(--warning);
+            border-radius: 4px;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { background: #FEF3C7; }
+            50% { background: #FDE68A; }
+        }
+        
+        .typing-input {
+            width: 100%;
+            padding: 16px;
+            font-size: 20px;
+            border: 3px solid #E5E7EB;
+            border-radius: 12px;
+            font-family: inherit;
+            letter-spacing: 2px;
+            word-break: break-all;
+        }
+        
+        .typing-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .typing-input:disabled {
+            background: #F3F4F6;
+        }
+        
+        /* Progress Bars */
+        .progress-section {
+            margin-top: 20px;
+        }
+        
+        .progress-section h3 {
+            margin-bottom: 12px;
+            color: var(--text);
+        }
+        
+        .progress-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 38px;
+            margin-bottom: 10px;
+        }
+        
+        .progress-name {
+            width: 80px;
+            font-weight: 600;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0;
+        }
+        
+        .progress-bar-bg {
+            flex: 1;
+            height: 28px;
+            background: #F3F4F6;
+            border-radius: 14px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 14px;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+            min-width: 0;
+        }
+        
+        .progress-bar-fill.self {
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+        }
+
+        /* Game two-column layout: main (left) + sidebar (right) */
+        .game-content {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .game-main {
+            flex: 1 1 auto;
+            min-width: 0; /* allow children to shrink */
+        }
+
+        .game-side {
+            width: 320px;
+            flex: 0 0 320px;
+        }
+
+        @media (max-width: 900px) {
+            .game-content { flex-direction: column; }
+            .game-side { width: 100%; flex: 0 0 auto; }
+        }
+        
+        .progress-bar-fill.other {
+            background: linear-gradient(90deg, #6366F1, #A78BFA);
+        }
+        
+        .progress-bar-fill.finished {
+            background: linear-gradient(90deg, var(--success), #34D399) !important;
+        }
+        
+        .progress-pct {
+            width: 50px;
+            text-align: right;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        
+        /* Countdown Overlay */
+        .countdown-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .countdown-overlay.active {
+            display: flex;
+        }
+        
+        .countdown-number {
+            font-size: 10em;
+            font-weight: 900;
+            color: white;
+            animation: countPop 0.8s ease;
+            text-shadow: 0 0 60px rgba(255,255,255,0.5);
+        }
+        
+        @keyframes countPop {
+            0% { transform: scale(2); opacity: 0; }
+            50% { transform: scale(0.9); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        /* Results */
+        .results-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+        }
+        
+        .results-table th {
+            text-align: left;
+            padding: 8px 12px;
+            color: var(--text-light);
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .results-table td {
+            padding: 12px;
+            background: #F9FAFB;
+            font-size: 15px;
+        }
+        
+        .results-table tr td:first-child { border-radius: 10px 0 0 10px; }
+        .results-table tr td:last-child { border-radius: 0 10px 10px 0; }
+        
+        .results-table .rank-1 td { background: #FEF3C7; }
+        .results-table .rank-2 td { background: #F3F4F6; }
+        .results-table .rank-3 td { background: #FED7AA; }
+        
+        .medal { font-size: 1.5em; }
+        
+        .winner-banner {
+            text-align: center;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+            border-radius: 16px;
+        }
+        
+        .winner-banner .trophy { font-size: 3em; }
+        .winner-banner .winner-name { font-size: 1.8em; font-weight: 800; color: #92400E; }
+        .winner-banner .winner-label { color: #B45309; font-weight: 600; }
+        
+        /* Error/Info Messages */
+        .msg-box {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+        
+        .msg-box.error { background: #FEE2E2; color: #991B1B; }
+        .msg-box.info { background: #DBEAFE; color: #1E40AF; }
+        .msg-box.warning { background: #FEF3C7; color: #92400E; }
+        
+        .hidden { display: none !important; }
+
+        /* Last 20s Countdown Banner */
+        .game-countdown-banner {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #EF4444, #DC2626);
+            color: white;
+            font-size: 1.8em;
+            font-weight: 900;
+            padding: 12px 36px;
+            border-radius: 16px;
+            z-index: 500;
+            animation: countdownPulse 1s infinite;
+            box-shadow: 0 4px 24px rgba(239, 68, 68, 0.5);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .game-countdown-banner.urgent {
+            background: linear-gradient(135deg, #DC2626, #991B1B);
+            animation: countdownUrgent 0.5s infinite;
+            font-size: 2.2em;
+        }
+
+        @keyframes countdownPulse {
+            0%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
+            50% { transform: translateX(-50%) scale(1.08); opacity: 0.9; }
+        }
+
+        @keyframes countdownUrgent {
+            0%, 100% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.15); }
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .card { padding: 24px 16px; }
+            h1 { font-size: 1.6em; }
+            .room-code-display .code { font-size: 2em; }
+            .target-text { font-size: 18px; padding: 14px; }
+            .typing-input { font-size: 18px; }
+            .game-header { gap: 8px; }
+            .stat-box .stat-value { font-size: 1.3em; }
+            .progress-name { width: 60px; }
+        }
+        
+        /* Confetti */
+        .confetti-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 999;
+            overflow: hidden;
+        }
+        
+        .confetti-piece {
+            position: absolute;
+            top: -20px;
+            width: 10px;
+            height: 10px;
+            animation: confettiFall 3s ease-in forwards;
+        }
+        
+        @keyframes confettiFall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* Firebase Config Screen */
+        .config-note {
+            background: #FEF3C7;
+            border: 2px solid #FDE68A;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #92400E;
+            line-height: 1.6;
+        }
+
+        .config-note code {
+            background: #FDE68A;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .time-limit-input {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .time-limit-input input {
+            width: 80px;
+            text-align: center;
+        }
+
+        .time-preset-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .time-preset-btn {
+            padding: 6px 14px;
+            border: 2px solid #E5E7EB;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .time-preset-btn:hover, .time-preset-btn.active {
+            border-color: var(--primary);
+            background: #EEF2FF;
+            color: var(--primary);
+        }
+
+        .char-count {
+            text-align: right;
+            color: var(--text-light);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        /* Racing-style progress bars */
+        #progress-bars {
+            position: relative;
+        }
+
+        .progress-item {
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+            position: relative;
+        }
+
+        .progress-rank {
+            width: 30px;
+            font-weight: 800;
+            font-size: 14px;
+            color: var(--text-light);
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .progress-rank.rank-1 { color: #F59E0B; }
+        .progress-rank.rank-2 { color: #9CA3AF; }
+        .progress-rank.rank-3 { color: #D97706; }
+
+        .guest-time-limit {
+            text-align: center;
+            padding: 10px 16px;
+            background: #EEF2FF;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-size: 15px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ==================== JOIN SCREEN ==================== -->
+        <div id="join-screen" class="screen card active">
+            <h1>⌨️ 中文打字競速比賽</h1>
+            <p class="subtitle">和同學一起比拼打字速度！</p>
+            
+            <div id="firebase-warning" class="msg-box warning hidden">
+                ⚠️ Firebase 尚未設定。請在程式碼中設定 FIREBASE_CONFIG 以啟用多人對戰功能。
+                <br>目前僅可使用「單人練習」模式。
+            </div>
+            
+            <div class="form-group">
+                <label>👤 你的名字</label>
+                <input type="text" id="player-name" placeholder="輸入你的名字" maxlength="20" autocomplete="off">
+            </div>
+            
+            <div class="btn-row">
+                <button class="btn btn-primary btn-lg" onclick="onCreateRoom()">🏠 建立房間</button>
+                <button class="btn btn-outline btn-lg" onclick="showJoinInput()">🚪 加入房間</button>
+            </div>
+            
+            <div id="join-section" class="hidden" style="margin-top: 20px;">
+                <div class="form-group">
+                    <label>🔑 房間代碼</label>
+                              <input type="text" id="room-code-input" placeholder="輸入 4 位數字" maxlength="4" inputmode="numeric" pattern="\d{4}"
+                                  style="letter-spacing: 0.2em; text-align: center; font-size: 20px; font-weight: 700;">
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-success" onclick="onJoinRoom()">加入比賽</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 24px; text-align: center;">
+                <button class="btn btn-outline" onclick="startPractice()" style="border-color: var(--success); color: var(--success);">
+                    🎯 單人練習
+                </button>
+            </div>
+            
+            <div id="join-error" class="msg-box error hidden" style="margin-top: 16px;"></div>
+        </div>
+        
+        <!-- ==================== LOBBY SCREEN ==================== -->
+        <div id="lobby-screen" class="screen card">
+            <h2>🏠 等待室</h2>
+            
+            <div class="room-code-display">
+                <div class="hint">分享此代碼給參賽者</div>
+                <div class="code" id="lobby-room-code">----</div>
+            </div>
+            
+            <div id="host-controls">
+                <div class="form-group">
+                    <label>📄 比賽文章</label>
+                    <div class="preset-buttons">
+                        <button class="preset-btn" onclick="selectPreset(0)">簡單</button>
+                        <button class="preset-btn" onclick="selectPreset(1)">中等</button>
+                        <button class="preset-btn" onclick="selectPreset(2)">較難</button>
+                        <button class="preset-btn" onclick="selectPreset(3)">自訂</button>
+                    </div>
+                    <textarea id="article-input" placeholder="在此輸入比賽文章..."></textarea>
+                    <div class="char-count"><span id="article-char-count">0</span> 字</div>
+                </div>
+                
+                <div class="form-group">
+                    <label>⏱ 時間限制</label>
+                    <div class="time-preset-buttons">
+                        <button class="time-preset-btn active" onclick="selectTimePreset(0)">不限時</button>
+                        <button class="time-preset-btn" onclick="selectTimePreset(30)">30秒</button>
+                        <button class="time-preset-btn" onclick="selectTimePreset(60)">60秒</button>
+                        <button class="time-preset-btn" onclick="selectTimePreset(90)">90秒</button>
+                        <button class="time-preset-btn" onclick="selectTimePreset(120)">120秒</button>
+                        <button class="time-preset-btn" onclick="selectTimePreset(-1)">自訂</button>
+                    </div>
+                    <div class="time-limit-input" id="custom-time-input" style="display:none;">
+                        <input type="text" id="time-limit-input" placeholder="輸入秒數" style="width:100px; text-align:center;" autocomplete="off">
+                        <span>秒</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="guest-article-preview" class="hidden">
+                <div class="form-group">
+                    <label>📄 比賽文章</label>
+                    <div class="target-text" id="preview-article-text" style="font-size:16px; max-height:300px; overflow-y:auto;"></div>
+                </div>
+                <div class="guest-time-limit" id="guest-time-limit">⏱ 時間限制：不限時</div>
+            </div>
+            
+            <div class="form-group">
+                <label>👥 參賽者 (<span id="player-count">0</span>)</label>
+                <ul class="player-list" id="lobby-player-list"></ul>
+            </div>
+            
+            <div class="btn-row">
+                <button class="btn btn-success btn-lg" id="start-btn" onclick="onStartGame()">🚀 開始比賽</button>
+                <button class="btn btn-error" onclick="onLeaveRoom()">離開房間</button>
+            </div>
+            
+            <div id="lobby-msg" class="msg-box info hidden" style="margin-top: 16px;"></div>
+        </div>
+        
+        <!-- ==================== GAME SCREEN ==================== -->
+        <div id="game-screen" class="screen card">
+            <div class="game-header">
+                <div class="stat-box">
+                    <div class="stat-value" id="timer-display">0:00</div>
+                    <div class="stat-label">時間</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="accuracy-display">100%</div>
+                    <div class="stat-label">準確率</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="cpm-display">0</div>
+                    <div class="stat-label">字/分</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="progress-display">0%</div>
+                    <div class="stat-label">進度</div>
+                </div>
+            </div>
+            
+            <div class="game-content">
+                <div class="game-main">
+                    <div class="target-text" id="target-text-display"></div>
+
+                    <textarea class="typing-input" id="typing-input" placeholder="在此開始打字..." disabled
+                              autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+                </div>
+
+                <div class="game-side">
+                    <div class="progress-section" id="progress-section">
+                        <h3>📊 參賽者進度</h3>
+                        <div id="progress-bars"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ==================== RESULT SCREEN ==================== -->
+        <div id="result-screen" class="screen card">
+            <h2>🏆 比賽結果</h2>
+            
+            <div class="winner-banner" id="winner-banner">
+                <div class="trophy">🏆</div>
+                <div class="winner-label">冠軍</div>
+                <div class="winner-name" id="winner-name">---</div>
+            </div>
+            
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>名次</th>
+                        <th>名字</th>
+                        <th>時間</th>
+                        <th>準確率</th>
+                        <th>字/分</th>
+                    </tr>
+                </thead>
+                <tbody id="results-body"></tbody>
+            </table>
+            
+            <div class="btn-row" style="margin-top: 24px;">
+                <button class="btn btn-primary btn-lg" id="play-again-btn" onclick="onPlayAgain()">🔄 再玩一次</button>
+                <button class="btn btn-outline" onclick="onBackToHome()">🏠 回到首頁</button>
+            </div>
+        </div>
+        
+        <!-- ==================== PRACTICE SCREEN (no Firebase) ==================== -->
+        <div id="practice-setup-screen" class="screen card">
+            <h2>🎯 單人練習</h2>
+            <div class="form-group">
+                <label>📄 練習文章</label>
+                <div class="preset-buttons">
+                    <button class="preset-btn" onclick="selectPracticePreset(0)">簡單</button>
+                    <button class="preset-btn" onclick="selectPracticePreset(1)">中等</button>
+                    <button class="preset-btn" onclick="selectPracticePreset(2)">較難</button>
+                    <button class="preset-btn" onclick="selectPracticePreset(3)">自訂</button>
+                </div>
+                <textarea id="practice-article-input" placeholder="在此輸入練習文章..."></textarea>
+                <div class="char-count"><span id="practice-char-count">0</span> 字</div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-success btn-lg" onclick="startPracticeGame()">開始練習</button>
+                <button class="btn btn-outline" onclick="onBackToHome()">返回</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Countdown Overlay -->
+    <div class="countdown-overlay" id="countdown-overlay">
+        <div class="countdown-number" id="countdown-number">3</div>
+    </div>
+
+    <!-- Last 20s Countdown Banner -->
+    <div id="game-countdown-banner" class="game-countdown-banner hidden">
+        ⏰ 剩餘 <span id="game-countdown-seconds">20</span> 秒
+    </div>
+    
+    <!-- Confetti Container -->
+    <div class="confetti-container" id="confetti-container"></div>
+
+<script>
+// ============================================================
+// FIREBASE CONFIGURATION - Replace with your own config!
+// ============================================================
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAKAb3s1p3mlKOjs4mLnP9CIDU0OYVPxP8",
+    authDomain: "typingcompetiton.firebaseapp.com",
+    databaseURL: "https://typingcompetiton-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "typingcompetiton",
+    storageBucket: "typingcompetiton.firebasestorage.app",
+    messagingSenderId: "1023400740013",
+    appId: "1:1023400740013:web:4cc941116d23ab08acb224"
+};
+
+// ============================================================
+// PRESET ARTICLES
+// ============================================================
+const PRESET_ARTICLES = [
+    // Easy (~60 chars)
+    "春天來了，大地萬物開始甦醒。樹木長出了嫩綠的新芽，花兒也紛紛綻放出美麗的花朵。小鳥在枝頭歡快地歌唱，蝴蝶在花叢中翩翩起舞。",
+    // Medium (~130 chars)
+    "讀書是一件非常重要的事情。透過閱讀，我們可以學到許多新的知識，開闊我們的視野。古人說：「書中自有黃金屋，書中自有顏如玉。」這句話告訴我們，書本中蘊藏著無窮的寶藏。只要我們用心去讀，就能夠從中獲得很多寶貴的經驗和智慧。讓我們一起養成每天讀書的好習慣吧！",
+    // Hard (~200 chars)
+    "科技的發展日新月異，深刻地改變了我們的生活方式。從智慧型手機到人工智慧，從網際網路到物聯網，每一項新技術的出現都為我們帶來了前所未有的便利。然而，在享受科技帶來便利的同時，我們也應該注意到它可能帶來的問題。過度依賴電子產品可能會影響我們的身體健康和人際關係。因此，我們需要學會合理地使用科技，讓它真正為我們的生活服務，而不是被它所控制。在未來，科技將繼續向前發展，我們應該以開放的心態去迎接每一次變革。"
+];
+
+// ============================================================
+// APPLICATION STATE
+// ============================================================
+let state = {
+    playerId: null,
+    playerName: '',
+    roomCode: null,
+    isHost: false,
+    isPractice: false,
+    gameStatus: 'idle', // idle, waiting, countdown, playing, finished
+    article: '',
+    timeLimit: 0, // 0 = unlimited
+    startTime: null,
+    finishTime: null,
+    players: {},
+    timerInterval: null,
+    isComposing: false,
+    firebaseReady: false,
+    listeners: []
+};
+
+let db = null;
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+function init() {
+    // Generate player ID
+    state.playerId = sessionStorage.getItem('playerId');
+    if (!state.playerId) {
+        state.playerId = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6);
+        sessionStorage.setItem('playerId', state.playerId);
+    }
+
+    // Restore player name
+    const savedName = localStorage.getItem('playerName');
+    if (savedName) {
+        document.getElementById('player-name').value = savedName;
+    }
+
+    // Initialize Firebase
+    try {
+        if (FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY') {
+            firebase.initializeApp(FIREBASE_CONFIG);
+            db = firebase.database();
+            state.firebaseReady = true;
+        } else {
+            document.getElementById('firebase-warning').classList.remove('hidden');
+        }
+    } catch (e) {
+        console.error('Firebase init error:', e);
+        document.getElementById('firebase-warning').classList.remove('hidden');
+    }
+
+    // Set up typing input events
+    const input = document.getElementById('typing-input');
+    input.addEventListener('compositionstart', () => { state.isComposing = true; });
+    input.addEventListener('compositionend', () => {
+        state.isComposing = false;
+        handleInput();
+    });
+    input.addEventListener('input', () => {
+        if (!state.isComposing) handleInput();
+    });
+    // Prevent paste
+    input.addEventListener('paste', (e) => e.preventDefault());
+
+    // Article input char count
+    document.getElementById('article-input').addEventListener('input', function() {
+        document.getElementById('article-char-count').textContent = this.value.length;
+    });
+    document.getElementById('practice-article-input').addEventListener('input', function() {
+        document.getElementById('practice-char-count').textContent = this.value.length;
+    });
+    // Sync custom time limit input to Firebase for guests
+    document.getElementById('time-limit-input').addEventListener('input', function() {
+        if (state.firebaseReady && state.roomCode && state.isHost && selectedTimePreset === -1) {
+            const val = parseInt(this.value, 10);
+            db.ref(`rooms/${state.roomCode}/timeLimit`).set(!isNaN(val) && val > 0 ? val : 0);
+        }
+    });
+
+    // Check URL for room code
+    const params = new URLSearchParams(window.location.search);
+    const roomFromUrl = params.get('room');
+    if (roomFromUrl) {
+        // Room codes are numeric 4-digit now
+        document.getElementById('room-code-input').value = roomFromUrl;
+        showJoinInput();
+    }
+
+    // Handle beforeunload
+    window.addEventListener('beforeunload', () => {
+        if (state.roomCode && state.firebaseReady && !state.isPractice) {
+            const playerRef = db.ref(`rooms/${state.roomCode}/players/${state.playerId}`);
+            playerRef.remove();
+        }
+    });
+}
+
+// ============================================================
+// SCREEN NAVIGATION
+// ============================================================
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+// ============================================================
+// JOIN / CREATE ROOM
+// ============================================================
+function getPlayerName() {
+    const name = document.getElementById('player-name').value.trim();
+    if (!name) {
+        showJoinError('請輸入你的名字！');
+        return null;
+    }
+    localStorage.setItem('playerName', name);
+    state.playerName = name;
+    return name;
+}
+
+function showJoinInput() {
+    document.getElementById('join-section').classList.remove('hidden');
+    document.getElementById('room-code-input').focus();
+}
+
+function showJoinError(msg) {
+    const el = document.getElementById('join-error');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 4000);
+}
+
+function generateRoomCode() {
+    // Generate a numeric 4-digit code (0000 - 9999)
+    const num = Math.floor(Math.random() * 10000);
+    return String(num).padStart(4, '0');
+}
+
+async function onCreateRoom() {
+    const name = getPlayerName();
+    if (!name) return;
+    if (!state.firebaseReady) {
+        showJoinError('Firebase 尚未設定，無法建立多人房間。請使用「單人練習」。');
+        return;
+    }
+
+    const roomCode = generateRoomCode();
+    state.roomCode = roomCode;
+    state.isHost = true;
+
+    // Create room in Firebase
+    const roomRef = db.ref(`rooms/${roomCode}`);
+    await roomRef.set({
+        host: state.playerId,
+        status: 'waiting',
+        article: PRESET_ARTICLES[0],
+        timeLimit: 0,
+        createdAt: firebase.database.ServerValue.TIMESTAMP,
+        players: {
+            [state.playerId]: {
+                name: name,
+                progress: 0,
+                accuracy: 100,
+                cpm: 0,
+                correctChars: 0,
+                totalTyped: 0,
+                finished: false,
+                finishTime: 0
+            }
+        }
+    });
+
+    enterLobby();
+}
+
+async function onJoinRoom() {
+    const name = getPlayerName();
+    if (!name) return;
+    if (!state.firebaseReady) {
+        showJoinError('Firebase 尚未設定，無法加入多人房間。');
+        return;
+    }
+
+    const code = document.getElementById('room-code-input').value.trim();
+    // Validate numeric 4-digit code
+    if (!/^\d{4}$/.test(code)) {
+        showJoinError('請輸入 4 位數字的房間代碼！');
+        return;
+    }
+
+    // Check if room exists
+    const snapshot = await db.ref(`rooms/${code}`).once('value');
+    if (!snapshot.exists()) {
+        showJoinError('找不到此房間，請確認代碼是否正確。');
+        return;
+    }
+
+    const room = snapshot.val();
+    if (room.status !== 'waiting') {
+        showJoinError('此房間的比賽已經開始或已結束。');
+        return;
+    }
+
+    state.roomCode = code;
+    state.isHost = (room.host === state.playerId);
+
+    // Add player to room
+    await db.ref(`rooms/${code}/players/${state.playerId}`).set({
+        name: name,
+        progress: 0,
+        accuracy: 100,
+        cpm: 0,
+        correctChars: 0,
+        totalTyped: 0,
+        finished: false,
+        finishTime: 0
+    });
+
+    enterLobby();
+}
+
+function enterLobby() {
+    showScreen('lobby-screen');
+    document.getElementById('lobby-room-code').textContent = state.roomCode;
+
+    // Show/hide host controls
+    if (state.isHost) {
+        document.getElementById('host-controls').classList.remove('hidden');
+        document.getElementById('guest-article-preview').classList.add('hidden');
+        document.getElementById('start-btn').classList.remove('hidden');
+        // Set default article
+        document.getElementById('article-input').value = PRESET_ARTICLES[0];
+        document.getElementById('article-char-count').textContent = PRESET_ARTICLES[0].length;
+        selectPreset(0);
+    } else {
+        document.getElementById('host-controls').classList.add('hidden');
+        document.getElementById('guest-article-preview').classList.remove('hidden');
+        document.getElementById('start-btn').classList.add('hidden');
+    }
+
+    listenToRoom();
+}
+
+function onLeaveRoom() {
+    if (state.firebaseReady && state.roomCode) {
+        db.ref(`rooms/${state.roomCode}/players/${state.playerId}`).remove();
+    }
+    cleanupListeners();
+    state.roomCode = null;
+    state.isHost = false;
+    state.gameStatus = 'idle';
+    showScreen('join-screen');
+}
+
+// ============================================================
+// FIREBASE LISTENERS
+// ============================================================
+function listenToRoom() {
+    if (!state.firebaseReady || !state.roomCode) return;
+
+    const roomRef = db.ref(`rooms/${state.roomCode}`);
+
+    // Listen for player changes
+    const playersRef = db.ref(`rooms/${state.roomCode}/players`);
+    const playersListener = playersRef.on('value', (snapshot) => {
+        const players = snapshot.val() || {};
+        state.players = players;
+        updateLobbyPlayerList(players);
+        if (state.gameStatus === 'playing') {
+            updateProgressBars(players);
+            checkAllFinished(players);
+        }
+    });
+    state.listeners.push({ ref: playersRef, event: 'value', callback: playersListener });
+
+    // Listen for game status changes
+    const statusRef = db.ref(`rooms/${state.roomCode}/status`);
+    const statusListener = statusRef.on('value', (snapshot) => {
+        const status = snapshot.val();
+        if (status === 'countdown' && state.gameStatus !== 'countdown' && state.gameStatus !== 'playing') {
+            // Fetch article and time limit, then start countdown
+            db.ref(`rooms/${state.roomCode}`).once('value').then(snap => {
+                const room = snap.val();
+                state.article = room.article || PRESET_ARTICLES[0];
+                state.timeLimit = room.timeLimit || 0;
+                startCountdown();
+            });
+        }
+        if (status === 'finished' && state.gameStatus === 'playing') {
+            endGame();
+        }
+    });
+    state.listeners.push({ ref: statusRef, event: 'value', callback: statusListener });
+
+    // Listen for article changes (for guests)
+    if (!state.isHost) {
+        const articleRef = db.ref(`rooms/${state.roomCode}/article`);
+        const articleListener = articleRef.on('value', (snapshot) => {
+            const article = snapshot.val();
+            if (article) {
+                document.getElementById('preview-article-text').textContent = article;
+            }
+        });
+        state.listeners.push({ ref: articleRef, event: 'value', callback: articleListener });
+
+        // Listen for time limit changes (for guests)
+        const timeLimitRef = db.ref(`rooms/${state.roomCode}/timeLimit`);
+        const timeLimitListener = timeLimitRef.on('value', (snapshot) => {
+            const tl = snapshot.val();
+            const el = document.getElementById('guest-time-limit');
+            if (el) {
+                el.textContent = tl && tl > 0 ? `⏱ 時間限制：${tl} 秒` : '⏱ 時間限制：不限時';
+            }
+        });
+        state.listeners.push({ ref: timeLimitRef, event: 'value', callback: timeLimitListener });
+    }
+}
+
+function cleanupListeners() {
+    state.listeners.forEach(({ ref, event, callback }) => {
+        ref.off(event, callback);
+    });
+    state.listeners = [];
+}
+
+function updateLobbyPlayerList(players) {
+    const list = document.getElementById('lobby-player-list');
+    const count = Object.keys(players).length;
+    document.getElementById('player-count').textContent = count;
+
+    list.innerHTML = '';
+    Object.entries(players).forEach(([id, p]) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <span>👤</span>
+            <span>${escapeHtml(p.name)}</span>
+            ${id === state.playerId ? '<span class="badge" style="background:var(--primary)">你</span>' : ''}
+        `;
+        // Check if this player is the host
+        db.ref(`rooms/${state.roomCode}/host`).once('value').then(snap => {
+            if (snap.val() === id) {
+                const badge = document.createElement('span');
+                badge.className = 'badge';
+                badge.textContent = '主持人';
+                li.appendChild(badge);
+            }
+        });
+        list.appendChild(li);
+    });
+}
+
+// ============================================================
+// ARTICLE PRESETS
+// ============================================================
+function selectPreset(index) {
+    document.querySelectorAll('#host-controls .preset-btn').forEach((b, i) => {
+        b.classList.toggle('active', i === index);
+    });
+    const input = document.getElementById('article-input');
+    if (index < 3) {
+        input.value = PRESET_ARTICLES[index];
+        input.disabled = true;
+    } else {
+        input.value = '';
+        input.disabled = false;
+        input.focus();
+    }
+    document.getElementById('article-char-count').textContent = input.value.length;
+}
+
+let selectedTimePreset = 0;
+function selectTimePreset(value) {
+    selectedTimePreset = value;
+    document.querySelectorAll('.time-preset-btn').forEach(b => b.classList.remove('active'));
+    if (value === -1) {
+        // Custom
+        document.querySelectorAll('.time-preset-btn').forEach((b, i) => {
+            if (i === 5) b.classList.add('active');
+        });
+        document.getElementById('custom-time-input').style.display = 'inline-flex';
+        document.getElementById('time-limit-input').value = '';
+        document.getElementById('time-limit-input').focus();
+    } else {
+        const btnIndex = value === 0 ? 0 : value === 30 ? 1 : value === 60 ? 2 : value === 90 ? 3 : 4;
+        document.querySelectorAll('.time-preset-btn')[btnIndex].classList.add('active');
+        document.getElementById('custom-time-input').style.display = 'none';
+        document.getElementById('time-limit-input').value = value > 0 ? value : '';
+    }
+    // Sync time limit to Firebase so guests see the change immediately
+    if (state.firebaseReady && state.roomCode && state.isHost) {
+        const tl = value === -1 ? 0 : (value > 0 ? value : 0);
+        db.ref(`rooms/${state.roomCode}/timeLimit`).set(tl);
+    }
+}
+
+function selectPracticePreset(index) {
+    document.querySelectorAll('#practice-setup-screen .preset-btn').forEach((b, i) => {
+        b.classList.toggle('active', i === index);
+    });
+    const input = document.getElementById('practice-article-input');
+    if (index < 3) {
+        input.value = PRESET_ARTICLES[index];
+        input.disabled = true;
+    } else {
+        input.value = '';
+        input.disabled = false;
+        input.focus();
+    }
+    document.getElementById('practice-char-count').textContent = input.value.length;
+}
+
+// ============================================================
+// START GAME
+// ============================================================
+async function onStartGame() {
+    if (!state.isHost) return;
+
+    const article = document.getElementById('article-input').value.trim();
+    if (!article) {
+        showLobbyMsg('請選擇或輸入比賽文章！', 'error');
+        return;
+    }
+
+    let timeLimit;
+    if (selectedTimePreset === -1) {
+        // Custom
+        const timeLimitStr = document.getElementById('time-limit-input').value.trim();
+        timeLimit = timeLimitStr ? parseInt(timeLimitStr, 10) : 0;
+        if (timeLimitStr && (isNaN(timeLimit) || timeLimit < 10)) {
+            showLobbyMsg('時間限制至少 10 秒！', 'error');
+            return;
+        }
+    } else {
+        timeLimit = selectedTimePreset > 0 ? selectedTimePreset : 0;
+    }
+
+    // Update room
+    await db.ref(`rooms/${state.roomCode}`).update({
+        article: article,
+        timeLimit: timeLimit,
+        status: 'countdown'
+    });
+
+    // Reset all players' progress
+    const players = state.players;
+    const updates = {};
+    Object.keys(players).forEach(id => {
+        updates[`players/${id}/progress`] = 0;
+        updates[`players/${id}/accuracy`] = 100;
+        updates[`players/${id}/cpm`] = 0;
+        updates[`players/${id}/correctChars`] = 0;
+        updates[`players/${id}/totalTyped`] = 0;
+        updates[`players/${id}/finished`] = false;
+        updates[`players/${id}/finishTime`] = 0;
+    });
+    await db.ref(`rooms/${state.roomCode}`).update(updates);
+
+    state.article = article;
+    state.timeLimit = timeLimit;
+}
+
+function showLobbyMsg(msg, type) {
+    const el = document.getElementById('lobby-msg');
+    el.textContent = msg;
+    el.className = `msg-box ${type}`;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 4000);
+}
+
+// ============================================================
+// PRACTICE MODE (No Firebase)
+// ============================================================
+function startPractice() {
+    showScreen('practice-setup-screen');
+    selectPracticePreset(0);
+}
+
+function startPracticeGame() {
+    const article = document.getElementById('practice-article-input').value.trim();
+    if (!article) {
+        alert('請選擇或輸入練習文章！');
+        return;
+    }
+    state.isPractice = true;
+    state.article = article;
+    state.timeLimit = 0;
+    state.playerName = document.getElementById('player-name').value.trim() || '練習者';
+    startCountdown();
+}
+
+// ============================================================
+// COUNTDOWN
+// ============================================================
+function startCountdown() {
+    state.gameStatus = 'countdown';
+    showScreen('game-screen');
+
+    // Set up game screen
+    renderTargetText();
+    document.getElementById('typing-input').value = '';
+    document.getElementById('typing-input').disabled = true;
+    updateStatsDisplay(0, 100, 0, 0);
+
+    if (!state.isPractice) {
+        document.getElementById('progress-section').classList.remove('hidden');
+        updateProgressBars(state.players);
+    } else {
+        document.getElementById('progress-section').classList.add('hidden');
+    }
+
+    // Countdown animation
+    const overlay = document.getElementById('countdown-overlay');
+    const numEl = document.getElementById('countdown-number');
+    overlay.classList.add('active');
+
+    let count = 3;
+    numEl.textContent = count;
+    numEl.style.animation = 'none';
+    void numEl.offsetWidth;
+    numEl.style.animation = 'countPop 0.8s ease';
+
+    const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+            numEl.textContent = count;
+            numEl.style.animation = 'none';
+            void numEl.offsetWidth;
+            numEl.style.animation = 'countPop 0.8s ease';
+        } else if (count === 0) {
+            numEl.textContent = '開始！';
+            numEl.style.animation = 'none';
+            void numEl.offsetWidth;
+            numEl.style.animation = 'countPop 0.8s ease';
+        } else {
+            clearInterval(interval);
+            overlay.classList.remove('active');
+            beginTyping();
+        }
+    }, 1000);
+}
+
+function beginTyping() {
+    state.gameStatus = 'playing';
+    state.startTime = Date.now();
+    state.finishTime = null;
+
+    const input = document.getElementById('typing-input');
+    input.disabled = false;
+    input.focus();
+
+    // Start timer
+    state.timerInterval = setInterval(updateTimer, 100);
+
+    // If multiplayer, set startTime in Firebase
+    if (!state.isPractice && state.isHost && state.firebaseReady) {
+        db.ref(`rooms/${state.roomCode}`).update({
+            status: 'playing',
+            startTime: firebase.database.ServerValue.TIMESTAMP
+        });
+    }
+}
+
+// ============================================================
+// TYPING ENGINE
+// ============================================================
+function handleInput() {
+    if (state.gameStatus !== 'playing') return;
+
+    const input = document.getElementById('typing-input');
+    const typed = input.value;
+    const target = state.article;
+
+    let correct = 0;
+    const len = Math.min(typed.length, target.length);
+    for (let i = 0; i < len; i++) {
+        if (typed[i] === target[i]) correct++;
+    }
+
+    const totalTyped = typed.length;
+    const progress = Math.min(100, Math.round((correct / target.length) * 100));
+    const accuracy = totalTyped > 0 ? Math.round((correct / Math.min(totalTyped, target.length)) * 100) : 100;
+    const elapsed = (Date.now() - state.startTime) / 1000 / 60; // minutes
+    const cpm = elapsed > 0 ? Math.round(correct / elapsed) : 0;
+
+    // Update display
+    updateStatsDisplay(null, accuracy, cpm, progress);
+    updateTargetHighlight(typed);
+
+    // Sync to Firebase (debounced)
+    if (!state.isPractice && state.firebaseReady) {
+        syncProgressDebounced(progress, accuracy, cpm, correct, totalTyped);
+    }
+
+    // Check completion
+    if (totalTyped >= target.length) {
+        finishTyping(accuracy, cpm, correct);
+    }
+}
+
+let syncTimeout = null;
+function syncProgressDebounced(progress, accuracy, cpm, correctChars, totalTyped) {
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(() => {
+        if (state.firebaseReady && state.roomCode) {
+            db.ref(`rooms/${state.roomCode}/players/${state.playerId}`).update({
+                progress, accuracy, cpm, correctChars, totalTyped
+            });
+        }
+    }, 200);
+}
+
+function finishTyping(accuracy, cpm, correct) {
+    if (state.gameStatus !== 'playing') return;
+    state.finishTime = Date.now();
+    const elapsed = (state.finishTime - state.startTime) / 1000;
+
+    document.getElementById('typing-input').disabled = true;
+
+    if (!state.isPractice && state.firebaseReady) {
+        const correctProgress = Math.min(100, Math.round((correct / state.article.length) * 100));
+        db.ref(`rooms/${state.roomCode}/players/${state.playerId}`).update({
+            progress: correctProgress,
+            accuracy: accuracy,
+            cpm: cpm,
+            correctChars: correct,
+            totalTyped: state.article.length,
+            finished: true,
+            finishTime: elapsed
+        });
+    }
+
+    if (state.isPractice) {
+        clearInterval(state.timerInterval);
+        showPracticeResults(accuracy, cpm, elapsed);
+    }
+    // For multiplayer, keep timer running for time limit check and countdown
+}
+
+function checkAllFinished(players) {
+    if (state.gameStatus !== 'playing') return;
+    // For timed games, always wait for time limit to expire
+    if (state.timeLimit > 0) return;
+    const allFinished = Object.values(players).every(p => p.finished);
+    if (allFinished && state.isHost && state.firebaseReady) {
+        db.ref(`rooms/${state.roomCode}/status`).set('finished');
+    }
+}
+
+// ============================================================
+// DISPLAY UPDATES
+// ============================================================
+function renderTargetText() {
+    const display = document.getElementById('target-text-display');
+    display.innerHTML = '';
+    for (let i = 0; i < state.article.length; i++) {
+        const span = document.createElement('span');
+        span.className = 'char';
+        span.textContent = state.article[i];
+        if (i === 0) span.classList.add('current');
+        display.appendChild(span);
+    }
+}
+
+function updateTargetHighlight(typed) {
+    const chars = document.querySelectorAll('#target-text-display .char');
+    const target = state.article;
+
+    for (let i = 0; i < chars.length; i++) {
+        chars[i].className = 'char';
+        if (i < typed.length) {
+            if (typed[i] === target[i]) {
+                chars[i].classList.add('correct');
+            } else {
+                chars[i].classList.add('wrong');
+            }
+        } else if (i === typed.length) {
+            chars[i].classList.add('current');
+        }
+    }
+
+    // Auto scroll to current char
+    if (typed.length < chars.length) {
+        chars[typed.length].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+function updateStatsDisplay(time, accuracy, cpm, progress) {
+    if (accuracy !== null && accuracy !== undefined) {
+        document.getElementById('accuracy-display').textContent = accuracy + '%';
+    }
+    document.getElementById('cpm-display').textContent = cpm;
+    document.getElementById('progress-display').textContent = progress + '%';
+}
+
+function updateTimer() {
+    if (!state.startTime) return;
+    const elapsed = (Date.now() - state.startTime) / 1000;
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = Math.floor(elapsed % 60);
+    document.getElementById('timer-display').textContent =
+        `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    // Last 20 seconds exciting countdown
+    if (state.timeLimit > 0) {
+        const remaining = Math.max(0, state.timeLimit - elapsed);
+        const banner = document.getElementById('game-countdown-banner');
+        const secondsEl = document.getElementById('game-countdown-seconds');
+        if (remaining <= 20 && remaining > 0) {
+            banner.classList.remove('hidden');
+            secondsEl.textContent = Math.ceil(remaining);
+            if (remaining <= 10) {
+                banner.classList.add('urgent');
+            } else {
+                banner.classList.remove('urgent');
+            }
+        } else {
+            banner.classList.add('hidden');
+            banner.classList.remove('urgent');
+        }
+    }
+
+    // Check time limit
+    if (state.timeLimit > 0 && elapsed >= state.timeLimit) {
+        if (state.gameStatus === 'playing') {
+            if (state.isPractice) {
+                const typed = document.getElementById('typing-input').value;
+                const target = state.article;
+                let correct = 0;
+                for (let i = 0; i < Math.min(typed.length, target.length); i++) {
+                    if (typed[i] === target[i]) correct++;
+                }
+                const acc = typed.length > 0 ? Math.round((correct / Math.min(typed.length, target.length)) * 100) : 0;
+                const cpmVal = elapsed > 0 ? Math.round(correct / (elapsed / 60)) : 0;
+                finishTyping(acc, cpmVal, correct);
+            } else if (state.isHost && state.firebaseReady) {
+                db.ref(`rooms/${state.roomCode}/status`).set('finished');
+            }
+        }
+    }
+}
+
+function updateProgressBars(players) {
+    const container = document.getElementById('progress-bars');
+    const playerColors = ['#4F46E5', '#9333EA', '#EC4899', '#F59E0B', '#10B981', '#06B6D4', '#8B5CF6', '#EF4444'];
+
+    // Sort players by progress descending (fastest first) — finished players by finishTime ascending, then by progress
+    const sorted = Object.entries(players).sort(([, a], [, b]) => {
+        if (a.finished && !b.finished) return -1;
+        if (!a.finished && b.finished) return 1;
+        if (a.finished && b.finished) {
+            return (a.finishTime || 9999) - (b.finishTime || 9999);
+        }
+        return (b.progress || 0) - (a.progress || 0);
+    });
+
+    // Assign a stable color index per player id
+    const allIds = Object.keys(players).sort();
+    const colorMap = {};
+    allIds.forEach((id, i) => { colorMap[id] = playerColors[i % playerColors.length]; });
+
+    // Build or update DOM elements
+    const ITEM_HEIGHT = 48; // height of each progress item including margin
+
+    sorted.forEach(([id, p], index) => {
+        const isSelf = id === state.playerId;
+        const color = colorMap[id];
+        const rank = index + 1;
+        const rankClass = rank <= 3 ? ` rank-${rank}` : '';
+
+        let item = container.querySelector(`[data-player-id="${id}"]`);
+        if (!item) {
+            // Create new element
+            item = document.createElement('div');
+            item.className = 'progress-item';
+            item.setAttribute('data-player-id', id);
+            item.innerHTML = `
+                <span class="progress-rank"></span>
+                <span class="progress-name"></span>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill"></div>
+                </div>
+                <span class="progress-pct"></span>
+            `;
+            container.appendChild(item);
+        }
+
+        // Update rank
+        const rankEl = item.querySelector('.progress-rank');
+        rankEl.textContent = '#' + rank;
+        rankEl.className = 'progress-rank' + rankClass;
+
+        // Update name
+        const nameEl = item.querySelector('.progress-name');
+        nameEl.style.color = isSelf ? 'var(--primary)' : '';
+        nameEl.innerHTML = escapeHtml(p.name) + (isSelf ? ' (你)' : '');
+
+        // Update progress bar fill
+        const fillEl = item.querySelector('.progress-bar-fill');
+        fillEl.className = `progress-bar-fill ${isSelf ? 'self' : 'other'} ${p.finished ? 'finished' : ''}`;
+        fillEl.style.width = (p.progress || 0) + '%';
+        if (!p.finished) {
+            fillEl.style.background = `linear-gradient(90deg, ${color}, ${color}88)`;
+        } else {
+            fillEl.style.background = '';
+        }
+        fillEl.textContent = (p.progress || 0) > 15 ? (p.progress || 0) + '%' : '';
+
+        // Update percentage
+        const pctEl = item.querySelector('.progress-pct');
+        pctEl.textContent = p.finished ? '✅' : (p.progress || 0) + '%';
+
+        // Animate position (racing style)
+        item.style.transform = `translateY(${index * ITEM_HEIGHT}px)`;
+        item.style.position = 'absolute';
+        item.style.left = '0';
+        item.style.right = '0';
+    });
+
+    // Remove players who left
+    container.querySelectorAll('.progress-item').forEach(el => {
+        const pid = el.getAttribute('data-player-id');
+        if (!players[pid]) {
+            el.remove();
+        }
+    });
+
+    // Set container height to accommodate all items
+    container.style.height = (sorted.length * ITEM_HEIGHT) + 'px';
+    container.style.position = 'relative';
+}
+
+// ============================================================
+// END GAME & RESULTS
+// ============================================================
+function endGame() {
+    if (state.gameStatus === 'finished') return;
+    state.gameStatus = 'finished';
+    clearInterval(state.timerInterval);
+    document.getElementById('typing-input').disabled = true;
+
+    // Hide countdown banner
+    const cntBanner = document.getElementById('game-countdown-banner');
+    if (cntBanner) { cntBanner.classList.add('hidden'); cntBanner.classList.remove('urgent'); }
+
+    // If player hasn't finished, record their current state
+    if (!state.finishTime) {
+        state.finishTime = Date.now();
+        const typed = document.getElementById('typing-input').value;
+        const target = state.article;
+        let correct = 0;
+        for (let i = 0; i < Math.min(typed.length, target.length); i++) {
+            if (typed[i] === target[i]) correct++;
+        }
+        const elapsed = (state.finishTime - state.startTime) / 1000;
+        const acc = typed.length > 0 ? Math.round((correct / Math.min(typed.length, target.length)) * 100) : 0;
+        const cpmVal = elapsed > 0 ? Math.round(correct / (elapsed / 60)) : 0;
+        const progress = Math.min(100, Math.round((correct / target.length) * 100));
+
+        if (state.firebaseReady && state.roomCode) {
+            db.ref(`rooms/${state.roomCode}/players/${state.playerId}`).update({
+                progress, accuracy: acc, cpm: cpmVal, correctChars: correct,
+                totalTyped: typed.length, finishTime: elapsed
+            });
+        }
+    }
+
+    // Wait a moment for final sync, then show results
+    setTimeout(() => {
+        if (state.firebaseReady && state.roomCode) {
+            db.ref(`rooms/${state.roomCode}/players`).once('value').then(snap => {
+                showResults(snap.val() || {});
+            });
+        }
+    }, 1500);
+}
+
+function showPracticeResults(accuracy, cpm, elapsed) {
+    state.gameStatus = 'finished';
+    clearInterval(state.timerInterval);
+    const results = {
+        [state.playerId]: {
+            name: state.playerName,
+            accuracy: accuracy,
+            cpm: cpm,
+            finishTime: elapsed,
+            finished: true,
+            progress: 100
+        }
+    };
+    showResults(results);
+}
+
+function showResults(players) {
+    showScreen('result-screen');
+
+    // Sort: finished first (by finishTime asc), then unfinished (by progress desc)
+    const sorted = Object.entries(players).sort(([, a], [, b]) => {
+        if (a.finished && !b.finished) return -1;
+        if (!a.finished && b.finished) return 1;
+        if (a.finished && b.finished) {
+            // Both finished: sort by effective score (cpm * accuracy)
+            const scoreA = (a.cpm || 0) * ((a.accuracy || 0) / 100);
+            const scoreB = (b.cpm || 0) * ((b.accuracy || 0) / 100);
+            return scoreB - scoreA;
+        }
+        return (b.progress || 0) - (a.progress || 0);
+    });
+
+    // Winner banner
+    if (sorted.length > 0 && sorted[0][1].finished) {
+        const winner = sorted[0][1];
+        document.getElementById('winner-name').textContent = winner.name;
+        document.getElementById('winner-banner').classList.remove('hidden');
+        launchConfetti();
+    } else {
+        document.getElementById('winner-banner').classList.add('hidden');
+    }
+
+    // Results table
+    const tbody = document.getElementById('results-body');
+    tbody.innerHTML = '';
+    const medals = ['🥇', '🥈', '🥉'];
+
+    sorted.forEach(([id, p], index) => {
+        const rank = index + 1;
+        const tr = document.createElement('tr');
+        if (rank <= 3) tr.className = `rank-${rank}`;
+
+        const timeStr = p.finished && p.finishTime
+            ? formatTime(p.finishTime)
+            : (p.progress ? `進度 ${p.progress}%` : '未完成');
+
+        tr.innerHTML = `
+            <td>${rank <= 3 ? `<span class="medal">${medals[index]}</span>` : rank}</td>
+            <td><strong>${escapeHtml(p.name)}</strong>${id === state.playerId ? ' <span style="color:var(--primary)">(你)</span>' : ''}</td>
+            <td>${timeStr}</td>
+            <td>${p.accuracy || 0}%</td>
+            <td>${p.cpm || 0}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Show play again only for host
+    if (state.isPractice || state.isHost) {
+        document.getElementById('play-again-btn').classList.remove('hidden');
+    } else {
+        document.getElementById('play-again-btn').classList.add('hidden');
+    }
+}
+
+// ============================================================
+// PLAY AGAIN / BACK TO HOME
+// ============================================================
+async function onPlayAgain() {
+    if (state.isPractice) {
+        showScreen('practice-setup-screen');
+        state.gameStatus = 'idle';
+        return;
+    }
+
+    if (state.isHost && state.firebaseReady && state.roomCode) {
+        // Reset room
+        const players = state.players;
+        const updates = { status: 'waiting' };
+        Object.keys(players).forEach(id => {
+            updates[`players/${id}/progress`] = 0;
+            updates[`players/${id}/accuracy`] = 100;
+            updates[`players/${id}/cpm`] = 0;
+            updates[`players/${id}/correctChars`] = 0;
+            updates[`players/${id}/totalTyped`] = 0;
+            updates[`players/${id}/finished`] = false;
+            updates[`players/${id}/finishTime`] = 0;
+        });
+        await db.ref(`rooms/${state.roomCode}`).update(updates);
+        state.gameStatus = 'waiting';
+        showScreen('lobby-screen');
+    }
+}
+
+function onBackToHome() {
+    if (state.roomCode && state.firebaseReady && !state.isPractice) {
+        db.ref(`rooms/${state.roomCode}/players/${state.playerId}`).remove();
+    }
+    cleanupListeners();
+    clearInterval(state.timerInterval);
+    state.roomCode = null;
+    state.isHost = false;
+    state.isPractice = false;
+    state.gameStatus = 'idle';
+    state.finishTime = null;
+    state.startTime = null;
+    showScreen('join-screen');
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 10);
+    if (m > 0) return `${m}分${s.toString().padStart(2, '0')}.${ms}秒`;
+    return `${s}.${ms}秒`;
+}
+
+function launchConfetti() {
+    const container = document.getElementById('confetti-container');
+    container.innerHTML = '';
+    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FED766', '#2AB7CA', '#F0386B', '#FF6F91', '#FF9671', '#FFC75F', '#F9F871'];
+    for (let i = 0; i < 80; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = Math.random() * 100 + '%';
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.animationDelay = Math.random() * 2 + 's';
+        piece.style.animationDuration = (2 + Math.random() * 2) + 's';
+        const size = 6 + Math.random() * 10;
+        piece.style.width = size + 'px';
+        piece.style.height = size + 'px';
+        piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        container.appendChild(piece);
+    }
+    setTimeout(() => { container.innerHTML = ''; }, 5000);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+init();
+</script>
+</body>
+</html>
