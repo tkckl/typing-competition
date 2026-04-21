@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F1 / F2 打字比賽 16:22</title>
+    <title>F1 / F2 打字比賽 16:33</title>
     <!--
     ============================================================
     中文打字比賽 - Chinese Typing Speed Competition
@@ -965,14 +965,15 @@ let selectedPracticeMode = 'comp'; // 'comp' = 比賽文章, 'custom' = 自訂
 
 async function loadArticles() {
     const parse = (text) => {
-        // Split on blank lines to get paragraphs; collapse any remaining
-        // internal newlines so each article is a single clean line.
+        // Split on blank lines to get individual articles/paragraphs.
+        // Keep internal newlines intact — setArticleFromRaw handles normalisation
+        // for typing while renderTargetText uses them for visual line breaks.
         let parts = text.split(/\r?\n\s*\r?\n/).map(s => s.trim()).filter(Boolean);
         if (parts.length < 2) {
+            // Single-block file: treat each non-empty line as a separate article.
             parts = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
         }
-        // Replace any embedded newlines (within a paragraph) with a space
-        return parts.map(p => p.replace(/\r?\n/g, ' '));
+        return parts;
     };
     const fetchText = async (url) => {
         try {
@@ -1479,27 +1480,35 @@ function applyLanguageClass(lang) {
 // `state.article` and paragraph array in `state.articleParagraphs`.
 function setArticleFromRaw(raw) {
     const text = raw || '';
-    // Split paragraphs on blank lines (preserve original line layout)
-    const partsRaw = text.split(/\r?\n\s*\r?\n/);
+    // Split paragraphs on blank lines
+    const partsRaw = text.split(/\r?\n\s*\r?\n/).map(s => s.trim()).filter(Boolean);
     const normalizedParts = [];
-    const paragraphLines = []; // array of arrays: per-paragraph original lines (trimmed)
+    const lineBreaks = []; // per-paragraph array of break indices (positions of separator spaces)
 
     partsRaw.forEach((part) => {
-        // Keep original line boundaries (do not drop intentionally empty lines here)
-        const linesRaw = part.split(/\r?\n/);
-        // For normalization (matching) we trim and remove empty lines
-        const normLines = linesRaw.map(s => s.trim()).filter(Boolean);
-        const norm = normLines.join(' ');
+        // Lines inside paragraph (preserve these visually)
+        const lines = part.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        // normalized paragraph used for matching: collapse internal newlines to spaces
+        const norm = lines.join(' ');
         normalizedParts.push(norm);
 
-        // For rendering, preserve trimmed lines (including empty strings to show blank lines)
-        const renderLines = linesRaw.map(s => s.trim());
-        paragraphLines.push(renderLines);
+        // compute indices (in normalized paragraph) of the separator spaces corresponding to original line breaks
+        const breaks = [];
+        let cum = 0;
+        for (let i = 0; i < lines.length; i++) {
+            cum += lines[i].length;
+            if (i < lines.length - 1) {
+                // the separator space index (0-based) in normalized paragraph
+                breaks.push(cum);
+                // account for the space we join with
+                cum += 1;
+            }
+        }
+        lineBreaks.push(breaks);
     });
 
-    // Keep both representations: normalized parts for matching, and original-line arrays for rendering
-    state.articleParagraphs = normalizedParts; // normalized paragraph strings
-    state.articleParagraphLines = paragraphLines; // per-paragraph arrays of lines
+    state.articleParagraphs = normalizedParts; // array of normalized paragraph strings
+    state.articleParagraphLineBreaks = lineBreaks; // array of arrays
     state.articleRaw = text;
     // Normalized single-line string used for matching across paragraphs (space between paragraphs)
     state.article = normalizedParts.join(' ');
@@ -1838,54 +1847,37 @@ function checkAllFinished(players) {
 function renderTargetText() {
     const display = document.getElementById('target-text-display');
     display.innerHTML = '';
-    // Render using the original line boundaries so visual breaks match the source file.
-    const paragraphsLines = (state.articleParagraphLines && state.articleParagraphLines.length) ? state.articleParagraphLines : [[state.article || '']];
+    const paragraphs = (state.articleParagraphs && state.articleParagraphs.length) ? state.articleParagraphs : [state.article || ''];
     let idx = 0; // index into normalized article (state.article)
 
-    paragraphsLines.forEach((lines, pIdx) => {
+    paragraphs.forEach((para, pIdx) => {
         const paraDiv = document.createElement('div');
         paraDiv.className = 'paragraph';
-
-        lines.forEach((line, lIdx) => {
-            const lineDiv = document.createElement('div');
-            lineDiv.className = 'line';
-            // Render each character in this original line as a span so highlighting maps correctly
-            for (let i = 0; i < line.length; i++) {
-                const span = document.createElement('span');
-                span.className = 'char';
-                span.textContent = line[i];
-                if (idx === 0) span.classList.add('current');
-                lineDiv.appendChild(span);
-                idx++;
-            }
-
-            // If this is not the last original line in the paragraph, insert the
-            // normalized separator space (so indices match `state.article`) and force a visual break.
-            if (lIdx < lines.length - 1) {
-                const spaceSpan = document.createElement('span');
-                spaceSpan.className = 'char';
-                spaceSpan.textContent = ' ';
-                lineDiv.appendChild(spaceSpan);
-                idx++;
-                paraDiv.appendChild(lineDiv);
+        const breaks = (state.articleParagraphLineBreaks && state.articleParagraphLineBreaks[pIdx]) || [];
+        for (let i = 0; i < para.length; i++) {
+            const span = document.createElement('span');
+            span.className = 'char';
+            span.textContent = para[i];
+            if (idx === 0) span.classList.add('current');
+            paraDiv.appendChild(span);
+            idx++;
+            // If this index is a line-break separator (original file had a newline here),
+            // add a visual break so the next characters appear on the next line.
+            if (breaks.includes(i)) {
                 paraDiv.appendChild(document.createElement('br'));
-            } else {
-                paraDiv.appendChild(lineDiv);
             }
-        });
-
-        // Between paragraphs we also need a single normalized space so the linear
-        // `state.article` string keeps the same length and indices.
-        if (pIdx < paragraphsLines.length - 1) {
+        }
+        // Insert a single visible space between paragraphs so the typing index
+        // matches the normalized article string (which joins paragraphs with a space).
+        if (pIdx < paragraphs.length - 1) {
             const spaceSpan = document.createElement('span');
             spaceSpan.className = 'char';
             spaceSpan.textContent = ' ';
             paraDiv.appendChild(spaceSpan);
             idx++;
         }
-
         display.appendChild(paraDiv);
-        if (pIdx < paragraphsLines.length - 1) {
+        if (pIdx < paragraphs.length - 1) {
             // Add visual gap between paragraphs
             const gap = document.createElement('div');
             gap.style.height = '12px';
