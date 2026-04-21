@@ -288,12 +288,14 @@
             margin-bottom: 16px;
             user-select: none;
             -webkit-user-select: none;
-            letter-spacing: 2px;
             min-height: 220px; /* increased show area */
             max-height: 420px;
             overflow-y: auto;
-            word-break: break-all;
         }
+
+        /* Language-specific display tweaks */
+        .lang-en .target-text { letter-spacing: 2px; word-break: break-all; }
+        .lang-zh .target-text { letter-spacing: 0; word-break: normal; }
         
         .target-text .char {
             position: relative;
@@ -332,9 +334,10 @@
             border: 3px solid #E5E7EB;
             border-radius: 12px;
             font-family: inherit;
-            letter-spacing: 2px;
-            word-break: break-all;
         }
+
+        .lang-en .typing-input { letter-spacing: 2px; word-break: break-all; }
+        .lang-zh .typing-input { letter-spacing: 0; word-break: normal; }
         
         .typing-input:focus {
             outline: none;
@@ -1115,6 +1118,9 @@ function init() {
         showJoinInput();
     }
 
+    // Ensure initial language class is set (defaults to selectedCompetition)
+    applyLanguageClass(selectedCompetition);
+
     // Handle beforeunload
     window.addEventListener('beforeunload', () => {
         if (state.roomCode && state.firebaseReady && !state.isPractice) {
@@ -1407,7 +1413,7 @@ function selectCompetition(lang, suppressSync) {
         if (idx < 0) idx = 0;
     }
     selectPreset(idx);
-
+    applyLanguageClass(lang);
     if (!suppressSync && state.firebaseReady && state.roomCode && state.isHost) {
         const article = (getArticles(lang)[idx]) || (getArticles(lang)[0]) || '';
         db.ref(`rooms/${state.roomCode}`).update({
@@ -1429,6 +1435,12 @@ function selectPracticeCompetition(lang) {
         if (idx < 0) idx = 0;
     }
     selectPracticePreset(idx);
+    applyLanguageClass(lang);
+}
+
+function applyLanguageClass(lang) {
+    document.body.classList.toggle('lang-zh', lang === 'zh');
+    document.body.classList.toggle('lang-en', lang === 'en');
 }
 
 // ============================================================
@@ -1585,6 +1597,8 @@ function startCountdown() {
     showScreen('game-screen');
 
     // Set up game screen
+    // Apply language class for proper spacing/word-break
+    applyLanguageClass(state.isPractice ? selectedPracticeCompetition : state.competition);
     renderTargetText();
     document.getElementById('typing-input').value = '';
     document.getElementById('typing-input').disabled = true;
