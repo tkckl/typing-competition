@@ -294,13 +294,13 @@
         }
 
         /* Language-specific display tweaks */
-        .lang-en .target-text { letter-spacing: 2px; word-break: break-all; }
-        .lang-zh .target-text { letter-spacing: 0; word-break: normal; }
+        .lang-en .target-text { word-break: break-word; }
+        .lang-zh .target-text { word-break: normal; }
         
         .target-text .char {
-            position: relative;
-            display: inline-block;
-            transition: all 0.1s;
+            display: inline;
+            border-radius: 3px;
+            transition: background 0.05s;
         }
         
         .target-text .char.correct {
@@ -336,8 +336,8 @@
             font-family: inherit;
         }
 
-        .lang-en .typing-input { letter-spacing: 2px; word-break: break-all; }
-        .lang-zh .typing-input { letter-spacing: 0; word-break: normal; }
+        .lang-en .typing-input { word-break: break-word; }
+        .lang-zh .typing-input { word-break: normal; }
         
         .typing-input:focus {
             outline: none;
@@ -959,11 +959,14 @@ let selectedPracticeCompetition = 'en';
 
 async function loadArticles() {
     const parse = (text) => {
+        // Split on blank lines to get paragraphs; collapse any remaining
+        // internal newlines so each article is a single clean line.
         let parts = text.split(/\r?\n\s*\r?\n/).map(s => s.trim()).filter(Boolean);
         if (parts.length < 2) {
             parts = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
         }
-        return parts;
+        // Replace any embedded newlines (within a paragraph) with a space
+        return parts.map(p => p.replace(/\r?\n/g, ' '));
     };
     const fetchText = async (url) => {
         try {
@@ -1335,6 +1338,7 @@ function listenToRoom() {
             const article = snapshot.val();
             if (article) {
                 document.getElementById('preview-article-text').textContent = article;
+                applyLanguageClass(state.competition || selectedCompetition);
             }
         });
         state.listeners.push({ ref: articleRef, event: 'value', callback: articleListener });
@@ -1346,6 +1350,7 @@ function listenToRoom() {
             state.competition = c;
             const el = document.getElementById('guest-competition-display');
             if (el) el.textContent = competitionLabel(c);
+            applyLanguageClass(c);
         });
         state.listeners.push({ ref: compRef, event: 'value', callback: compListener });
 
@@ -1538,6 +1543,7 @@ async function onStartGame() {
     // Update room
     await db.ref(`rooms/${state.roomCode}`).update({
         article: article,
+        competition: selectedCompetition,
         timeLimit: timeLimit,
         status: 'countdown'
     });
@@ -1558,6 +1564,7 @@ async function onStartGame() {
 
     state.article = article;
     state.timeLimit = timeLimit;
+    applyLanguageClass(selectedCompetition);
 }
 
 function showLobbyMsg(msg, type) {
