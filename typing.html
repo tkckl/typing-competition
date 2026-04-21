@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>中文打字競速比賽</title>
+    <title>F1 / F2 打字競速比賽</title>
     <!--
     ============================================================
     中文打字競速比賽 - Chinese Typing Speed Competition
@@ -691,8 +691,8 @@
     <div class="container">
         <!-- ==================== JOIN SCREEN ==================== -->
         <div id="join-screen" class="screen card active">
-            <h1>⌨️ 中文打字競速比賽</h1>
-            <p class="subtitle">和同學一起比拼打字速度！</p>
+            <h1>⌨️ F1 / F2 打字競速比賽</h1>
+            <p class="subtitle">F1 英文打字 ・ F2 中文打字 ・ 和同學一起比拼！</p>
             
             <div id="firebase-warning" class="msg-box warning hidden">
                 ⚠️ Firebase 尚未設定。請在程式碼中設定 FIREBASE_CONFIG 以啟用多人對戰功能。
@@ -740,6 +740,13 @@
             
             <div id="host-controls">
                 <div class="form-group">
+                    <label>🏆 比賽組別</label>
+                    <div class="preset-buttons">
+                        <button class="preset-btn active" id="comp-en-btn" onclick="selectCompetition('en')">F1 (英文)</button>
+                        <button class="preset-btn" id="comp-zh-btn" onclick="selectCompetition('zh')">F2 (中文)</button>
+                    </div>
+                </div>
+                <div class="form-group">
                     <label>📄 比賽文章</label>
                     <div class="preset-buttons">
                         <button class="preset-btn" onclick="selectPreset(0)">簡單</button>
@@ -769,6 +776,10 @@
             </div>
             
             <div id="guest-article-preview" class="hidden">
+                <div class="form-group">
+                    <label>🏆 比賽組別</label>
+                    <div id="guest-competition-display" style="padding:10px 16px; background:#EEF2FF; border-radius:10px; color:var(--primary); font-weight:600;">F1 (英文)</div>
+                </div>
                 <div class="form-group">
                     <label>📄 比賽文章</label>
                     <div class="target-text" id="preview-article-text" style="font-size:16px; max-height:300px; overflow-y:auto;"></div>
@@ -860,6 +871,13 @@
         <div id="practice-setup-screen" class="screen card">
             <h2>🎯 單人練習</h2>
             <div class="form-group">
+                <label>🏆 比賽組別</label>
+                <div class="preset-buttons">
+                    <button class="preset-btn active" id="prac-comp-en-btn" onclick="selectPracticeCompetition('en')">F1 (英文)</button>
+                    <button class="preset-btn" id="prac-comp-zh-btn" onclick="selectPracticeCompetition('zh')">F2 (中文)</button>
+                </div>
+            </div>
+            <div class="form-group">
                 <label>📄 練習文章</label>
                 <div class="preset-buttons">
                     <button class="preset-btn" onclick="selectPracticePreset(0)">簡單</button>
@@ -892,7 +910,19 @@
 
 <script>
 // ============================================================
-// FIREBASE CONFIGURATION - Replace with your own config!
+// FIREBASE CONFIGURATION
+// ============================================================
+// NOTE: Firebase web API keys are NOT secrets — they are public
+// identifiers used by client-side SDKs. Real protection is enforced
+// via Firebase Database Rules and (optionally) Google Cloud HTTP
+// referrer restrictions on the API key.
+// See: https://firebase.google.com/docs/projects/api-keys
+// To silence GitHub's secret-scanning alert:
+//   1. In Google Cloud Console > APIs & Services > Credentials,
+//      restrict this API key by HTTP referrer to your hosting
+//      domain (e.g. https://<user>.github.io/*).
+//   2. Lock down Realtime Database rules so only intended paths
+//      (rooms/*) are readable / writable.
 // ============================================================
 const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAKAb3s1p3mlKOjs4mLnP9CIDU0OYVPxP8",
@@ -905,16 +935,92 @@ const FIREBASE_CONFIG = {
 };
 
 // ============================================================
-// PRESET ARTICLES
+// PRESET ARTICLES (fallback if chinese.txt / english.txt fail to load)
 // ============================================================
-const PRESET_ARTICLES = [
-    // Easy (~60 chars)
-    "春天來了，大地萬物開始甦醒。樹木長出了嫩綠的新芽，花兒也紛紛綻放出美麗的花朵。小鳥在枝頭歡快地歌唱，蝴蝶在花叢中翩翩起舞。",
-    // Medium (~130 chars)
-    "讀書是一件非常重要的事情。透過閱讀，我們可以學到許多新的知識，開闊我們的視野。古人說：「書中自有黃金屋，書中自有顏如玉。」這句話告訴我們，書本中蘊藏著無窮的寶藏。只要我們用心去讀，就能夠從中獲得很多寶貴的經驗和智慧。讓我們一起養成每天讀書的好習慣吧！",
-    // Hard (~200 chars)
-    "科技的發展日新月異，深刻地改變了我們的生活方式。從智慧型手機到人工智慧，從網際網路到物聯網，每一項新技術的出現都為我們帶來了前所未有的便利。然而，在享受科技帶來便利的同時，我們也應該注意到它可能帶來的問題。過度依賴電子產品可能會影響我們的身體健康和人際關係。因此，我們需要學會合理地使用科技，讓它真正為我們的生活服務，而不是被它所控制。在未來，科技將繼續向前發展，我們應該以開放的心態去迎接每一次變革。"
-];
+const PRESET_ARTICLES_FALLBACK = {
+    zh: [
+        "春天來了，大地萬物開始甦醒。樹木長出了嫩綠的新芽，花兒也紛紛綻放出美麗的花朵。小鳥在枝頭歡快地歌唱，蝴蝶在花叢中翩翩起舞。",
+        "讀書是一件非常重要的事情。透過閱讀，我們可以學到許多新的知識，開闊我們的視野。古人說：「書中自有黃金屋，書中自有顏如玉。」這句話告訴我們，書本中蘊藏著無窮的寶藏。只要我們用心去讀，就能夠從中獲得很多寶貴的經驗和智慧。讓我們一起養成每天讀書的好習慣吧！",
+        "科技的發展日新月異，深刻地改變了我們的生活方式。從智慧型手機到人工智慧，從網際網路到物聯網，每一項新技術的出現都為我們帶來了前所未有的便利。然而，在享受科技帶來便利的同時，我們也應該注意到它可能帶來的問題。過度依賴電子產品可能會影響我們的身體健康和人際關係。因此，我們需要學會合理地使用科技，讓它真正為我們的生活服務，而不是被它所控制。在未來，科技將繼續向前發展，我們應該以開放的心態去迎接每一次變革。"
+    ],
+    en: [
+        "The quick brown fox jumps over the lazy dog. Practice makes perfect when you type every day.",
+        "Reading is one of the most important habits a student can develop. Through books we explore new ideas, expand our vocabulary, and learn to think more clearly about the world around us.",
+        "Technology evolves at a remarkable pace, and with each new innovation our daily lives change in subtle but powerful ways. Smartphones, artificial intelligence, and the internet have reshaped how we work, learn, and connect with one another. While these tools bring great convenience, they also demand that we use them thoughtfully so they serve us rather than control us."
+    ]
+};
+
+let ARTICLES = { zh: [], en: [] };
+let selectedCompetition = 'en';        // 'en' = F1, 'zh' = F2
+let selectedPracticeCompetition = 'en';
+
+async function loadArticles() {
+    const parse = (text) => {
+        let parts = text.split(/\r?\n\s*\r?\n/).map(s => s.trim()).filter(Boolean);
+        if (parts.length < 2) {
+            parts = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        }
+        return parts;
+    };
+    const fetchText = async (url) => {
+        try {
+            const r = await fetch(url, { cache: 'no-cache' });
+            if (!r.ok) return null;
+            return await r.text();
+        } catch (e) {
+            console.warn('Failed to load', url, e);
+            return null;
+        }
+    };
+    const [zhText, enText] = await Promise.all([fetchText('chinese.txt'), fetchText('english.txt')]);
+    ARTICLES.zh = zhText ? parse(zhText) : [];
+    ARTICLES.en = enText ? parse(enText) : [];
+    if (!ARTICLES.zh.length) ARTICLES.zh = PRESET_ARTICLES_FALLBACK.zh.slice();
+    if (!ARTICLES.en.length) ARTICLES.en = PRESET_ARTICLES_FALLBACK.en.slice();
+}
+
+function getArticles(lang) {
+    const arr = ARTICLES[lang];
+    return arr && arr.length ? arr : PRESET_ARTICLES_FALLBACK[lang];
+}
+
+function competitionLabel(lang) {
+    return lang === 'zh' ? 'F2 (中文)' : 'F1 (英文)';
+}
+
+// ============================================================
+// SOUND EFFECTS (Web Audio API — no external assets)
+// ============================================================
+let audioCtx = null;
+let soundEnabled = true;
+function ensureAudio() {
+    if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch (e) { audioCtx = null; }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+}
+function playTone(freq, duration, type, peakGain) {
+    if (!soundEnabled) return;
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.value = freq;
+        const now = ctx.currentTime;
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(peakGain || 0.15, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+    } catch (e) { /* ignore */ }
+}
+function playCorrectSound() { playTone(880, 0.06, 'sine', 0.12); }
+function playWrongSound()   { playTone(180, 0.10, 'square', 0.08); }
 
 // ============================================================
 // APPLICATION STATE
@@ -927,6 +1033,7 @@ let state = {
     isPractice: false,
     gameStatus: 'idle', // idle, waiting, countdown, playing, finished
     article: '',
+    competition: 'en',
     timeLimit: 0, // 0 = unlimited
     startTime: null,
     finishTime: null,
@@ -934,7 +1041,8 @@ let state = {
     timerInterval: null,
     isComposing: false,
     firebaseReady: false,
-    listeners: []
+    listeners: [],
+    lastTypedLen: 0
 };
 
 let db = null;
@@ -1069,11 +1177,13 @@ async function onCreateRoom() {
     state.isHost = true;
 
     // Create room in Firebase
+    const defaultArticle = (getArticles(selectedCompetition)[0]) || '';
     const roomRef = db.ref(`rooms/${roomCode}`);
     await roomRef.set({
         host: state.playerId,
         status: 'waiting',
-        article: PRESET_ARTICLES[0],
+        article: defaultArticle,
+        competition: selectedCompetition,
         timeLimit: 0,
         createdAt: firebase.database.ServerValue.TIMESTAMP,
         players: {
@@ -1148,9 +1258,8 @@ function enterLobby() {
         document.getElementById('host-controls').classList.remove('hidden');
         document.getElementById('guest-article-preview').classList.add('hidden');
         document.getElementById('start-btn').classList.remove('hidden');
-        // Set default article
-        document.getElementById('article-input').value = PRESET_ARTICLES[0];
-        document.getElementById('article-char-count').textContent = PRESET_ARTICLES[0].length;
+        // Set default article for current competition
+        selectCompetition(selectedCompetition, true);
         selectPreset(0);
     } else {
         document.getElementById('host-controls').classList.add('hidden');
@@ -1201,7 +1310,8 @@ function listenToRoom() {
             // Fetch article and time limit, then start countdown
             db.ref(`rooms/${state.roomCode}`).once('value').then(snap => {
                 const room = snap.val();
-                state.article = room.article || PRESET_ARTICLES[0];
+                state.competition = room.competition || 'en';
+                state.article = room.article || (getArticles(state.competition)[0]) || '';
                 state.timeLimit = room.timeLimit || 0;
                 startCountdown();
             });
@@ -1222,6 +1332,16 @@ function listenToRoom() {
             }
         });
         state.listeners.push({ ref: articleRef, event: 'value', callback: articleListener });
+
+        // Listen for competition changes (for guests)
+        const compRef = db.ref(`rooms/${state.roomCode}/competition`);
+        const compListener = compRef.on('value', (snapshot) => {
+            const c = snapshot.val() || 'en';
+            state.competition = c;
+            const el = document.getElementById('guest-competition-display');
+            if (el) el.textContent = competitionLabel(c);
+        });
+        state.listeners.push({ ref: compRef, event: 'value', callback: compListener });
 
         // Listen for time limit changes (for guests)
         const timeLimitRef = db.ref(`rooms/${state.roomCode}/timeLimit`);
@@ -1270,15 +1390,58 @@ function updateLobbyPlayerList(players) {
 }
 
 // ============================================================
+// COMPETITION (F1 / F2) SELECTION
+// ============================================================
+function selectCompetition(lang, suppressSync) {
+    selectedCompetition = lang;
+    state.competition = lang;
+    document.getElementById('comp-en-btn').classList.toggle('active', lang === 'en');
+    document.getElementById('comp-zh-btn').classList.toggle('active', lang === 'zh');
+
+    // Re-apply current preset for the new language
+    const activeBtn = document.querySelector('#host-controls .form-group:nth-of-type(2) .preset-btn.active');
+    let idx = 0;
+    if (activeBtn) {
+        const siblings = Array.from(activeBtn.parentNode.children);
+        idx = Math.min(siblings.indexOf(activeBtn), 3);
+        if (idx < 0) idx = 0;
+    }
+    selectPreset(idx);
+
+    if (!suppressSync && state.firebaseReady && state.roomCode && state.isHost) {
+        const article = (getArticles(lang)[idx]) || (getArticles(lang)[0]) || '';
+        db.ref(`rooms/${state.roomCode}`).update({
+            competition: lang,
+            article: article
+        });
+    }
+}
+
+function selectPracticeCompetition(lang) {
+    selectedPracticeCompetition = lang;
+    document.getElementById('prac-comp-en-btn').classList.toggle('active', lang === 'en');
+    document.getElementById('prac-comp-zh-btn').classList.toggle('active', lang === 'zh');
+    const activeBtn = document.querySelector('#practice-setup-screen .form-group:nth-of-type(2) .preset-btn.active');
+    let idx = 0;
+    if (activeBtn) {
+        const siblings = Array.from(activeBtn.parentNode.children);
+        idx = Math.min(siblings.indexOf(activeBtn), 3);
+        if (idx < 0) idx = 0;
+    }
+    selectPracticePreset(idx);
+}
+
+// ============================================================
 // ARTICLE PRESETS
 // ============================================================
 function selectPreset(index) {
-    document.querySelectorAll('#host-controls .preset-btn').forEach((b, i) => {
+    document.querySelectorAll('#host-controls .form-group:nth-of-type(2) .preset-btn').forEach((b, i) => {
         b.classList.toggle('active', i === index);
     });
     const input = document.getElementById('article-input');
-    if (index < 3) {
-        input.value = PRESET_ARTICLES[index];
+    const articles = getArticles(selectedCompetition);
+    if (index < 3 && articles[index]) {
+        input.value = articles[index];
         input.disabled = true;
     } else {
         input.value = '';
@@ -1286,6 +1449,11 @@ function selectPreset(index) {
         input.focus();
     }
     document.getElementById('article-char-count').textContent = input.value.length;
+
+    // Sync the chosen article to Firebase so guests see it
+    if (state.firebaseReady && state.roomCode && state.isHost && index < 3 && articles[index]) {
+        db.ref(`rooms/${state.roomCode}/article`).set(articles[index]);
+    }
 }
 
 let selectedTimePreset = 0;
@@ -1314,12 +1482,13 @@ function selectTimePreset(value) {
 }
 
 function selectPracticePreset(index) {
-    document.querySelectorAll('#practice-setup-screen .preset-btn').forEach((b, i) => {
+    document.querySelectorAll('#practice-setup-screen .form-group:nth-of-type(2) .preset-btn').forEach((b, i) => {
         b.classList.toggle('active', i === index);
     });
     const input = document.getElementById('practice-article-input');
-    if (index < 3) {
-        input.value = PRESET_ARTICLES[index];
+    const articles = getArticles(selectedPracticeCompetition);
+    if (index < 3 && articles[index]) {
+        input.value = articles[index];
         input.disabled = true;
     } else {
         input.value = '';
@@ -1392,7 +1561,7 @@ function showLobbyMsg(msg, type) {
 // ============================================================
 function startPractice() {
     showScreen('practice-setup-screen');
-    selectPracticePreset(0);
+    selectPracticeCompetition(selectedPracticeCompetition);
 }
 
 function startPracticeGame() {
@@ -1463,6 +1632,7 @@ function beginTyping() {
     state.gameStatus = 'playing';
     state.startTime = Date.now();
     state.finishTime = null;
+    state.lastTypedLen = 0;
 
     const input = document.getElementById('typing-input');
     input.disabled = false;
@@ -1490,6 +1660,20 @@ function handleInput() {
     const typed = input.value;
     const target = state.article;
 
+    // ---- Sound feedback for newly typed character(s) ----
+    const prevLen = state.lastTypedLen || 0;
+    if (typed.length > prevLen) {
+        // Check the character at position (typed.length - 1) only.
+        // For IME composition the whole word arrives at compositionend.
+        const lastIdx = typed.length - 1;
+        if (lastIdx < target.length && typed[lastIdx] === target[lastIdx]) {
+            playCorrectSound();
+        } else {
+            playWrongSound();
+        }
+    }
+    state.lastTypedLen = typed.length;
+
     let correct = 0;
     const len = Math.min(typed.length, target.length);
     for (let i = 0; i < len; i++) {
@@ -1511,8 +1695,10 @@ function handleInput() {
         syncProgressDebounced(progress, accuracy, cpm, correct, totalTyped);
     }
 
-    // Check completion
-    if (totalTyped >= target.length) {
+    // Check completion: must type the FULL text CORRECTLY (typed === target).
+    // This is the standard rule in real typing competitions — you cannot win
+    // by typing rubbish that just happens to be the right length.
+    if (typed === target) {
         finishTyping(accuracy, cpm, correct);
     }
 }
@@ -1813,17 +1999,21 @@ function showPracticeResults(accuracy, cpm, elapsed) {
 function showResults(players) {
     showScreen('result-screen');
 
-    // Sort: finished first (by finishTime asc), then unfinished (by progress desc)
+    // Sort: finished first (faster finishTime wins), then unfinished (by progress desc).
+    // With the strict win rule (typed === target), every "finished" player has 100% accuracy,
+    // so finishTime alone is the fair primary key. CPM/accuracy are still shown in the table.
     const sorted = Object.entries(players).sort(([, a], [, b]) => {
         if (a.finished && !b.finished) return -1;
         if (!a.finished && b.finished) return 1;
         if (a.finished && b.finished) {
-            // Both finished: sort by effective score (cpm * accuracy)
-            const scoreA = (a.cpm || 0) * ((a.accuracy || 0) / 100);
-            const scoreB = (b.cpm || 0) * ((b.accuracy || 0) / 100);
-            return scoreB - scoreA;
+            return (a.finishTime || 9999) - (b.finishTime || 9999);
         }
-        return (b.progress || 0) - (a.progress || 0);
+        // Both unfinished: more correct progress wins; tie-break by net WPM (cpm * accuracy)
+        const pa = a.progress || 0, pb = b.progress || 0;
+        if (pb !== pa) return pb - pa;
+        const scoreA = (a.cpm || 0) * ((a.accuracy || 0) / 100);
+        const scoreB = (b.cpm || 0) * ((b.accuracy || 0) / 100);
+        return scoreB - scoreA;
     });
 
     // Winner banner
@@ -1952,7 +2142,7 @@ function launchConfetti() {
 // ============================================================
 // INIT
 // ============================================================
-init();
+loadArticles().finally(() => init());
 </script>
 </body>
 </html>
