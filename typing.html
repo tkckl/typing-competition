@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F1 / F2 打字比賽 16:33</title>
+    <title>F1 / F2 打字比賽 16:43</title>
     <!--
     ============================================================
     中文打字比賽 - Chinese Typing Speed Competition
@@ -759,10 +759,8 @@
                 <div class="form-group">
                     <label>📄 比賽文章</label>
                     <div class="preset-buttons">
-                        <button class="preset-btn" onclick="selectPreset(0)">簡單</button>
-                        <button class="preset-btn" onclick="selectPreset(1)">中等</button>
-                        <button class="preset-btn" onclick="selectPreset(2)">較難</button>
-                        <button class="preset-btn" onclick="selectPreset(3)">自訂</button>
+                        <button class="preset-btn active" id="host-mode-comp" onclick="setHostMode('comp')">預設</button>
+                        <button class="preset-btn" id="host-mode-custom" onclick="setHostMode('custom')">自訂</button>
                     </div>
                     <textarea id="article-input" placeholder="在此輸入比賽文章..."></textarea>
                     <div class="char-count"><span id="article-char-count">0</span> 字</div>
@@ -1276,7 +1274,7 @@ function enterLobby() {
         document.getElementById('start-btn').classList.remove('hidden');
         // Set default article for current competition
         selectCompetition(selectedCompetition, true);
-        selectPreset(0);
+        setHostMode('comp');
     } else {
         document.getElementById('host-controls').classList.add('hidden');
         document.getElementById('guest-article-preview').classList.remove('hidden');
@@ -1419,18 +1417,14 @@ function selectCompetition(lang, suppressSync) {
     document.getElementById('comp-en-btn').classList.toggle('active', lang === 'en');
     document.getElementById('comp-zh-btn').classList.toggle('active', lang === 'zh');
 
-    // Re-apply current preset for the new language
-    const activeBtn = document.querySelector('#host-controls .form-group:nth-of-type(2) .preset-btn.active');
-    let idx = 0;
-    if (activeBtn) {
-        const siblings = Array.from(activeBtn.parentNode.children);
-        idx = Math.min(siblings.indexOf(activeBtn), 3);
-        if (idx < 0) idx = 0;
+    // Re-apply current host mode (refreshes textarea content for new language)
+    if (selectedHostMode === 'comp') {
+        setHostMode('comp');
     }
-    selectPreset(idx);
     applyLanguageClass(lang);
     if (!suppressSync && state.firebaseReady && state.roomCode && state.isHost) {
-        const article = (getArticles(lang)[idx]) || (getArticles(lang)[0]) || '';
+        const article = document.getElementById('article-input').value
+            || (getArticles(lang).join('\n\n')) || '';
         db.ref(`rooms/${state.roomCode}`).update({
             competition: lang,
             article: article
@@ -1517,14 +1511,16 @@ function setArticleFromRaw(raw) {
 // ============================================================
 // ARTICLE PRESETS
 // ============================================================
-function selectPreset(index) {
-    document.querySelectorAll('#host-controls .form-group:nth-of-type(2) .preset-btn').forEach((b, i) => {
-        b.classList.toggle('active', i === index);
-    });
+let selectedHostMode = 'comp'; // 'comp' = 預設 (full file), 'custom' = 自訂
+
+function setHostMode(mode) {
+    selectedHostMode = mode === 'custom' ? 'custom' : 'comp';
+    document.getElementById('host-mode-comp').classList.toggle('active', selectedHostMode === 'comp');
+    document.getElementById('host-mode-custom').classList.toggle('active', selectedHostMode === 'custom');
     const input = document.getElementById('article-input');
-    const articles = getArticles(selectedCompetition);
-    if (index < 3 && articles[index]) {
-        input.value = articles[index];
+    if (selectedHostMode === 'comp') {
+        const articles = getArticles(selectedCompetition);
+        input.value = articles.join('\n\n');
         input.disabled = true;
     } else {
         input.value = '';
@@ -1534,8 +1530,8 @@ function selectPreset(index) {
     document.getElementById('article-char-count').textContent = input.value.length;
 
     // Sync the chosen article to Firebase so guests see it
-    if (state.firebaseReady && state.roomCode && state.isHost && index < 3 && articles[index]) {
-        db.ref(`rooms/${state.roomCode}/article`).set(articles[index]);
+    if (state.firebaseReady && state.roomCode && state.isHost && selectedHostMode === 'comp') {
+        db.ref(`rooms/${state.roomCode}/article`).set(input.value);
     }
 }
 
