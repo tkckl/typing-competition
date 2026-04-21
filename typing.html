@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F1 / F2 打字比賽 14:34</title>
+    <title>F1 / F2 打字比賽 15:02</title>
     <!--
     ============================================================
     中文打字比賽 - Chinese Typing Speed Competition
@@ -334,6 +334,13 @@
             border: 3px solid #E5E7EB;
             border-radius: 12px;
             font-family: inherit;
+        }
+
+        /* Paragraph container inside target display */
+        .target-text .paragraph {
+            display: block;
+            margin-bottom: 10px;
+            word-break: break-word;
         }
 
         .lang-en .typing-input { word-break: break-word; }
@@ -1319,7 +1326,8 @@ function listenToRoom() {
             db.ref(`rooms/${state.roomCode}`).once('value').then(snap => {
                 const room = snap.val();
                 state.competition = room.competition || 'en';
-                state.article = room.article || (getArticles(state.competition)[0]) || '';
+                const rawArticle = room.article || (getArticles(state.competition)[0]) || '';
+                setArticleFromRaw(rawArticle);
                 state.timeLimit = room.timeLimit || 0;
                 startCountdown();
             });
@@ -1336,7 +1344,9 @@ function listenToRoom() {
         const articleListener = articleRef.on('value', (snapshot) => {
             const article = snapshot.val();
             if (article) {
-                document.getElementById('preview-article-text').textContent = article;
+                // Show line breaks in the preview
+                const html = escapeHtml(article).replace(/\r?\n/g, '<br>');
+                document.getElementById('preview-article-text').innerHTML = html;
                 applyLanguageClass(state.competition || selectedCompetition);
             }
         });
@@ -1464,6 +1474,45 @@ function applyLanguageClass(lang) {
     document.body.classList.toggle('lang-en', lang === 'en');
 }
 
+// Set article from raw text (preserve paragraph breaks visually but
+// normalize for typing comparison). Stores normalized string in
+// `state.article` and paragraph array in `state.articleParagraphs`.
+function setArticleFromRaw(raw) {
+    const text = raw || '';
+    // Split paragraphs on blank lines
+    const partsRaw = text.split(/\r?\n\s*\r?\n/).map(s => s.trim()).filter(Boolean);
+    const normalizedParts = [];
+    const lineBreaks = []; // per-paragraph array of break indices (positions of separator spaces)
+
+    partsRaw.forEach((part) => {
+        // Lines inside paragraph (preserve these visually)
+        const lines = part.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        // normalized paragraph used for matching: collapse internal newlines to spaces
+        const norm = lines.join(' ');
+        normalizedParts.push(norm);
+
+        // compute indices (in normalized paragraph) of the separator spaces corresponding to original line breaks
+        const breaks = [];
+        let cum = 0;
+        for (let i = 0; i < lines.length; i++) {
+            cum += lines[i].length;
+            if (i < lines.length - 1) {
+                // the separator space index (0-based) in normalized paragraph
+                breaks.push(cum);
+                // account for the space we join with
+                cum += 1;
+            }
+        }
+        lineBreaks.push(breaks);
+    });
+
+    state.articleParagraphs = normalizedParts; // array of normalized paragraph strings
+    state.articleParagraphLineBreaks = lineBreaks; // array of arrays
+    state.articleRaw = text;
+    // Normalized single-line string used for matching across paragraphs (space between paragraphs)
+    state.article = normalizedParts.join(' ');
+}
+
 // ============================================================
 // ARTICLE PRESETS
 // ============================================================
@@ -1578,7 +1627,7 @@ async function onStartGame() {
     });
     await db.ref(`rooms/${state.roomCode}`).update(updates);
 
-    state.article = article;
+    setArticleFromRaw(article);
     state.timeLimit = timeLimit;
     applyLanguageClass(selectedCompetition);
 }
@@ -1606,7 +1655,7 @@ function startPracticeGame() {
         return;
     }
     state.isPractice = true;
-    state.article = article;
+    setArticleFromRaw(article);
     state.timeLimit = 0;
     state.playerName = document.getElementById('player-name').value.trim() || '練習者';
     startCountdown();
@@ -1694,7 +1743,9 @@ function handleInput() {
     if (state.gameStatus !== 'playing') return;
 
     const input = document.getElementById('typing-input');
-    const typed = input.value;
+    const typedRaw = input.value;
+    // Normalize typed input (convert any line breaks to spaces)
+    const typed = typedRaw.replace(/\r?\n/g, ' ');
     const target = state.article;
 
     // ---- Sound feedback for newly typed character(s) ----
@@ -1795,13 +1846,43 @@ function checkAllFinished(players) {
 function renderTargetText() {
     const display = document.getElementById('target-text-display');
     display.innerHTML = '';
-    for (let i = 0; i < state.article.length; i++) {
-        const span = document.createElement('span');
-        span.className = 'char';
-        span.textContent = state.article[i];
-        if (i === 0) span.classList.add('current');
-        display.appendChild(span);
-    }
+    const paragraphs = (state.articleParagraphs && state.articleParagraphs.length) ? state.articleParagraphs : [state.article || ''];
+    let idx = 0; // index into normalized article (state.article)
+
+    paragraphs.forEach((para, pIdx) => {
+        const paraDiv = document.createElement('div');
+        paraDiv.className = 'paragraph';
+        const breaks = (state.articleParagraphLineBreaks && state.articleParagraphLineBreaks[pIdx]) || [];
+        for (let i = 0; i < para.length; i++) {
+            const span = document.createElement('span');
+            span.className = 'char';
+            span.textContent = para[i];
+            if (idx === 0) span.classList.add('current');
+            paraDiv.appendChild(span);
+            idx++;
+            // If this index is a line-break separator (original file had a newline here),
+            // add a visual break so the next characters appear on the next line.
+            if (breaks.includes(i)) {
+                paraDiv.appendChild(document.createElement('br'));
+            }
+        }
+        // Insert a single visible space between paragraphs so the typing index
+        // matches the normalized article string (which joins paragraphs with a space).
+        if (pIdx < paragraphs.length - 1) {
+            const spaceSpan = document.createElement('span');
+            spaceSpan.className = 'char';
+            spaceSpan.textContent = ' ';
+            paraDiv.appendChild(spaceSpan);
+            idx++;
+        }
+        display.appendChild(paraDiv);
+        if (pIdx < paragraphs.length - 1) {
+            // Add visual gap between paragraphs
+            const gap = document.createElement('div');
+            gap.style.height = '12px';
+            display.appendChild(gap);
+        }
+    });
 }
 
 function updateTargetHighlight(typed) {
