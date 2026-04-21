@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F1 / F2 打字比賽</title>
+    <title>F1 / F2 打字比賽 14:34</title>
     <!--
     ============================================================
     中文打字比賽 - Chinese Typing Speed Competition
@@ -883,10 +883,8 @@
             <div class="form-group">
                 <label>📄 練習文章</label>
                 <div class="preset-buttons">
-                    <button class="preset-btn" onclick="selectPracticePreset(0)">簡單</button>
-                    <button class="preset-btn" onclick="selectPracticePreset(1)">中等</button>
-                    <button class="preset-btn" onclick="selectPracticePreset(2)">較難</button>
-                    <button class="preset-btn" onclick="selectPracticePreset(3)">自訂</button>
+                    <button class="preset-btn active" id="prac-mode-comp" onclick="setPracticeMode('comp')">比賽文章</button>
+                    <button class="preset-btn" id="prac-mode-custom" onclick="setPracticeMode('custom')">自訂</button>
                 </div>
                 <textarea id="practice-article-input" placeholder="在此輸入練習文章..."></textarea>
                 <div class="char-count"><span id="practice-char-count">0</span> 字</div>
@@ -956,6 +954,7 @@ const PRESET_ARTICLES_FALLBACK = {
 let ARTICLES = { zh: [], en: [] };
 let selectedCompetition = 'en';        // 'en' = F1, 'zh' = F2
 let selectedPracticeCompetition = 'en';
+let selectedPracticeMode = 'comp'; // 'comp' = 比賽文章, 'custom' = 自訂
 
 async function loadArticles() {
     const parse = (text) => {
@@ -1432,15 +1431,32 @@ function selectPracticeCompetition(lang) {
     selectedPracticeCompetition = lang;
     document.getElementById('prac-comp-en-btn').classList.toggle('active', lang === 'en');
     document.getElementById('prac-comp-zh-btn').classList.toggle('active', lang === 'zh');
-    const activeBtn = document.querySelector('#practice-setup-screen .form-group:nth-of-type(2) .preset-btn.active');
-    let idx = 0;
-    if (activeBtn) {
-        const siblings = Array.from(activeBtn.parentNode.children);
-        idx = Math.min(siblings.indexOf(activeBtn), 3);
-        if (idx < 0) idx = 0;
-    }
-    selectPracticePreset(idx);
+    // When switching practice competition, if practice mode is 'comp', load
+    // all competition articles into the practice textarea.
     applyLanguageClass(lang);
+    if (selectedPracticeMode === 'comp') {
+        const articles = getArticles(lang);
+        document.getElementById('practice-article-input').value = articles.join('\n\n');
+        document.getElementById('practice-article-input').disabled = true;
+        document.getElementById('practice-char-count').textContent = document.getElementById('practice-article-input').value.length;
+    }
+}
+
+function setPracticeMode(mode) {
+    selectedPracticeMode = mode === 'custom' ? 'custom' : 'comp';
+    document.getElementById('prac-mode-comp').classList.toggle('active', selectedPracticeMode === 'comp');
+    document.getElementById('prac-mode-custom').classList.toggle('active', selectedPracticeMode === 'custom');
+    const ta = document.getElementById('practice-article-input');
+    if (selectedPracticeMode === 'comp') {
+        const articles = getArticles(selectedPracticeCompetition);
+        ta.value = articles.join('\n\n');
+        ta.disabled = true;
+    } else {
+        ta.disabled = false;
+        ta.value = '';
+        ta.focus();
+    }
+    document.getElementById('practice-char-count').textContent = ta.value.length;
 }
 
 function applyLanguageClass(lang) {
