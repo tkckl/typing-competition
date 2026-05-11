@@ -35,6 +35,7 @@
     ============================================================
     -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1057,37 +1058,21 @@ let state = {
 };
 
 let db = null;
+let auth = null;
+let firebaseInitPromise = null;
 
 // ============================================================
 // INITIALIZATION
 // ============================================================
-function init() {
-    // Generate player ID
-    state.playerId = sessionStorage.getItem('playerId');
-    if (!state.playerId) {
-        state.playerId = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6);
-        sessionStorage.setItem('playerId', state.playerId);
-    }
-
+async function init() {
     // Restore player name
     const savedName = localStorage.getItem('playerName');
     if (savedName) {
         document.getElementById('player-name').value = savedName;
     }
 
-    // Initialize Firebase
-    try {
-        if (FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY') {
-            firebase.initializeApp(FIREBASE_CONFIG);
-            db = firebase.database();
-            state.firebaseReady = true;
-        } else {
-            document.getElementById('firebase-warning').classList.remove('hidden');
-        }
-    } catch (e) {
-        console.error('Firebase init error:', e);
-        document.getElementById('firebase-warning').classList.remove('hidden');
-    }
+    firebaseInitPromise = initializeFirebase();
+    await firebaseInitPromise;
 
     // Set up typing input events
     const input = document.getElementById('typing-input');
@@ -1138,6 +1123,48 @@ function init() {
     });
 }
 
+async function initializeFirebase() {
+    try {
+        if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
+            document.getElementById('firebase-warning').classList.remove('hidden');
+            return;
+        }
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(FIREBASE_CONFIG);
+        }
+
+        auth = firebase.auth();
+        db = firebase.database();
+
+        let user = auth.currentUser;
+        if (!user) {
+            const credential = await auth.signInAnonymously();
+            user = credential.user;
+        }
+
+        if (!user) {
+            throw new Error('Anonymous auth did not return a user');
+        }
+
+        state.playerId = user.uid;
+        state.firebaseReady = true;
+    } catch (e) {
+        console.error('Firebase init/auth error:', e);
+        state.firebaseReady = false;
+        const warning = document.getElementById('firebase-warning');
+        warning.innerHTML = '⚠️ Firebase 尚未完成設定。請在 Firebase Authentication 啟用 Anonymous 登入，否則多人對戰功能會被拒絕。<br>目前仍可使用「單人練習」模式。';
+        warning.classList.remove('hidden');
+    }
+}
+
+async function ensureFirebaseReady() {
+    if (firebaseInitPromise) {
+        await firebaseInitPromise;
+    }
+    return state.firebaseReady;
+}
+
 // ============================================================
 // SCREEN NAVIGATION
 // ============================================================
@@ -1181,7 +1208,7 @@ function generateRoomCode() {
 async function onCreateRoom() {
     const name = getPlayerName();
     if (!name) return;
-    if (!state.firebaseReady) {
+    if (!(await ensureFirebaseReady())) {
         showJoinError('Firebase 尚未設定，無法建立多人房間。請使用「單人練習」。');
         return;
     }
@@ -1220,7 +1247,7 @@ async function onCreateRoom() {
 async function onJoinRoom() {
     const name = getPlayerName();
     if (!name) return;
-    if (!state.firebaseReady) {
+    if (!(await ensureFirebaseReady())) {
         showJoinError('Firebase 尚未設定，無法加入多人房間。');
         return;
     }
